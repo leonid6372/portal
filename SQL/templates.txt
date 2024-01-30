@@ -1,0 +1,27 @@
+CREATE TABLE "user"(
+	user_id SERIAL PRIMARY KEY,
+	"1c" JSONB,
+	account INT
+);
+
+CREATE TABLE item(
+	item_id SERIAL PRIMARY KEY,
+	"name" varchar(150) NOT NULL,
+	description varchar(500),
+	price INT,
+	photo_path varchar(150),
+	is_active BOOL NOT NULL
+);
+
+CREATE TABLE in_cart_item(
+	in_cart_item_id SERIAL PRIMARY KEY,
+	item_id INT REFERENCES item(item_id) ON DELETE CASCADE
+);
+
+CREATE TABLE cart(
+	cart_id SERIAL PRIMARY KEY,
+	in_cart_item_id INT REFERENCES in_cart_item(in_cart_item_id) ON DELETE CASCADE,
+	user_id INT REFERENCES "user"(user_id) ON DELETE CASCADE,
+	is_active BOOL,
+	"date" DATE
+);
