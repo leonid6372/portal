@@ -38,13 +38,13 @@ func (s *Storage) GetStoreList() (*string, error) {
 		return nil, fmt.Errorf("%s: prepare statement: %w", op, err)
 	}
 
-	var storeList string
+	var storeList *string
 	for qrResult.Next() {
-		if err := qrResult.Scan(&storeList); err != nil {
+		if err := qrResult.Scan(storeList); err != nil {
 			fmt.Println(err)
 			return nil, fmt.Errorf("%s: prepare statement: %w", op, err)
 		}
 	}
 
-	return &storeList, nil
+	return storeList, nil
 }

@@ -1,4 +1,5 @@
-env: "local" # Окружение - local, dev или prod
+#env: "local" # Окружение - local, dev или prod
+log_lvl: "info" # Минимальный отображаемый уровень логов - info, debug, warning или error
 sql_storage:  # Данные для работы с sql-хранилещем данных
   sql_driver: "postgres"
   sql_info: "host=::1 port=5432 user=postgres password=1111 dbname=portal_KD sslmode=disable"
