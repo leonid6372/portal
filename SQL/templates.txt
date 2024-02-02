@@ -10,12 +10,14 @@ CREATE TABLE item(
 	description varchar(500),
 	price INT,
 	photo_path varchar(150),
-	is_active BOOL NOT NULL
+	is_available BOOL NOT NULL,
+	is_service BOOL NOT NULL
 );
 
 CREATE TABLE in_cart_item(
 	in_cart_item_id SERIAL PRIMARY KEY,
-	item_id INT REFERENCES item(item_id) ON DELETE CASCADE
+	item_id INT REFERENCES item(item_id) ON DELETE CASCADE,
+	quantity INT NOT NULL
 );
 
 CREATE TABLE cart(

@@ -7,14 +7,16 @@ import (
 	"os"
 	"os/signal"
 	"portal/internal/config"
-	getStoreList "portal/internal/http-server/handlers/get_store_list"
+
+	addCartItem "portal/internal/http-server/handlers/add_cart_item"
+	getShopList "portal/internal/http-server/handlers/get_shop_list"
+	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
 	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/gofiber/fiber/v2/log"
 )
 
 const (
@@ -27,9 +29,11 @@ const (
 func main() {
 	cfg := config.MustLoad()
 
+	log := setupLogger(cfg.LogLVL)
+
 	storage, err := postgres.New(cfg.SQLStorage)
 	if err != nil {
-		log.Fatal(err)
+		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
 	}
 
@@ -40,7 +44,8 @@ func main() {
 	router.Use(middleware.Recoverer) // Если где-то внутри сервера (обработчика запроса) произойдет паника, приложение не должно упасть
 	router.Use(middleware.URLFormat) // Парсер URLов поступающих запросов
 
-	router.Get("/api/get_store_list", getStoreList.New(storage))
+	router.Get("/api/get_shop_list", getShopList.New(log, storage))
+	router.Post("/api/add_cart_item", addCartItem.New(log, storage))
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 

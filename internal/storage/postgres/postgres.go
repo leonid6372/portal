@@ -2,17 +2,25 @@ package postgres
 
 import (
 	"database/sql"
-	_ "encoding/json"
 	"fmt"
 
 	"portal/internal/config"
 
-	_ "github.com/go-playground/validator"
 	_ "github.com/lib/pq"
 )
 
 const (
-	qrGetStoreList = `SELECT jsonb_agg(item) FROM item`
+	qrGetShopList = `SELECT jsonb_agg(item) FROM item`
+
+	qrCheckAvailableQuantity = `SELECT quantity
+								  FROM item
+								 WHERE item_id = $1`
+
+	qrAddCartItem = `INSERT INTO in_cart_item(item_id, quantity)
+					      VALUES ($1, $2)
+						   
+					 ON CONFLICT (item_id) DO 
+					  UPDATE SET quantity = quantity + $2`
 )
 
 type Storage struct {
@@ -30,21 +38,26 @@ func New(cfg config.SQLStorage) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
-func (s *Storage) GetStoreList() (*string, error) {
-	const op = "storage.postgres.GetStoreList" // Имя текущей функции для логов и ошибок
+func (s *Storage) GetShopList() (string, error) {
+	const op = "storage.postgres.GetShopList" // Имя текущей функции для логов и ошибок
 
-	qrResult, err := s.db.Query(qrGetStoreList)
+	qrResult, err := s.db.Query(qrGetShopList)
 	if err != nil {
-		return nil, fmt.Errorf("%s: prepare statement: %w", op, err)
+		return "", fmt.Errorf("%s: prepare statement: %w", op, err)
 	}
 
-	var storeList *string
+	var shopList string
 	for qrResult.Next() {
-		if err := qrResult.Scan(storeList); err != nil {
+		if err := qrResult.Scan(&shopList); err != nil {
 			fmt.Println(err)
-			return nil, fmt.Errorf("%s: prepare statement: %w", op, err)
+			return "", fmt.Errorf("%s: prepare statement: %w", op, err)
 		}
 	}
 
-	return storeList, nil
+	return shopList, nil
+}
+
+func (s *Storage) AddCartItem(item_id, quantity int) error {
+
+	return nil
 }
