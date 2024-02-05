@@ -11,16 +11,7 @@ import (
 
 const (
 	qrGetShopList = `SELECT jsonb_agg(item) FROM item`
-
-	qrCheckAvailableQuantity = `SELECT quantity
-								  FROM item
-								 WHERE item_id = $1`
-
-	qrAddCartItem = `INSERT INTO in_cart_item(item_id, quantity)
-					      VALUES ($1, $2)
-						   
-					 ON CONFLICT (item_id) DO 
-					  UPDATE SET quantity = quantity + $2`
+	qrAddCartItem = `SELECT add_cart_item($1, $2)`
 )
 
 type Storage struct {
@@ -43,14 +34,14 @@ func (s *Storage) GetShopList() (string, error) {
 
 	qrResult, err := s.db.Query(qrGetShopList)
 	if err != nil {
-		return "", fmt.Errorf("%s: prepare statement: %w", op, err)
+		return "", fmt.Errorf("%s: %w", op, err)
 	}
 
 	var shopList string
 	for qrResult.Next() {
 		if err := qrResult.Scan(&shopList); err != nil {
 			fmt.Println(err)
-			return "", fmt.Errorf("%s: prepare statement: %w", op, err)
+			return "", fmt.Errorf("%s: %w", op, err)
 		}
 	}
 
@@ -58,6 +49,12 @@ func (s *Storage) GetShopList() (string, error) {
 }
 
 func (s *Storage) AddCartItem(item_id, quantity int) error {
+	const op = "storage.postgres.AddCartItem"
+
+	_, err := s.db.Query(qrAddCartItem, item_id, quantity)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
 
 	return nil
 }

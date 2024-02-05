@@ -1,8 +1,12 @@
 CREATE TABLE "user"(
 	user_id SERIAL PRIMARY KEY,
 	"1c" JSONB,
-	account INT
+	balance INT
 );
+
+INSERT INTO "user"("1c", balance)
+VALUES ('{"login":"aa001", "test":"test"}'::jsonb, 100000),
+       ('{"login":"aa002", "test":"test"}'::jsonb, 0)
 
 CREATE TABLE item(
 	item_id SERIAL PRIMARY KEY,
@@ -16,7 +20,7 @@ CREATE TABLE item(
 
 CREATE TABLE in_cart_item(
 	in_cart_item_id SERIAL PRIMARY KEY,
-	item_id INT REFERENCES item(item_id) ON DELETE CASCADE,
+	item_id INT UNIQUE REFERENCES item(item_id) ON DELETE CASCADE,
 	quantity INT NOT NULL
 );
 
@@ -27,3 +31,18 @@ CREATE TABLE cart(
 	is_active BOOL,
 	"date" DATE
 );
+
+CREATE FUNCTION add_cart_item(int, int) RETURNS void AS
+$$
+DECLARE
+	err text = 'Item with item_id = ' || $1 || ' is not available';
+BEGIN
+	IF (SELECT is_available FROM item WHERE item_id = $1) = FALSE THEN
+		RAISE EXCEPTION '%', err;
+	ELSE
+		INSERT INTO in_cart_item(item_id, quantity)
+		VALUES($1, $2)
+		ON CONFLICT (item_id) DO UPDATE SET quantity = in_cart_item.quantity + $2;
+	END IF;
+END;
+$$ LANGUAGE plpgsql;

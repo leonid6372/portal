@@ -33,6 +33,7 @@ func New(log *slog.Logger, shopListGetter ShopListGetter) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to get shop list")
 
+			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get shop list"))
 
 			return

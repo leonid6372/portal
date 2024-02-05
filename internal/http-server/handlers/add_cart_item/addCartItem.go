@@ -46,6 +46,7 @@ func New(log *slog.Logger, cartItemAdder CartItemAdder) http.HandlerFunc {
 			// Обработаем её отдельно
 			log.Error("request body is empty")
 
+			w.WriteHeader(400)
 			render.JSON(w, r, resp.Error("empty request"))
 
 			return
@@ -53,6 +54,7 @@ func New(log *slog.Logger, cartItemAdder CartItemAdder) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
 
+			w.WriteHeader(400)
 			render.JSON(w, r, resp.Error("failed to decode request"))
 
 			return
@@ -64,13 +66,38 @@ func New(log *slog.Logger, cartItemAdder CartItemAdder) http.HandlerFunc {
 		if err := validator.New().Struct(req); err != nil {
 			validateErr := err.(validator.ValidationErrors)
 
+			w.WriteHeader(400)
 			log.Error("invalid request", sl.Err(err))
 
 			render.JSON(w, r, resp.ValidationError(validateErr))
 
 			return
 		}
-		fmt.Println("kkk")
-		return
+
+		err = cartItemAdder.AddCartItem(req.ItemID, req.Quantity)
+		if err != nil {
+			// Обработка недоступности указанного item_id. Вложена внутрь, чтобы не наткнуться на разыменование nil ошибки
+			if err.Error() == string("storage.postgres.AddCartItem: pq: Item with item_id = "+fmt.Sprint(req.ItemID)+" is not available") {
+
+				log.Error(err.Error())
+
+				w.WriteHeader(406)
+				render.JSON(w, r, resp.Error("item is not available"))
+
+				return
+			}
+
+			// Обработка общего случая ошибки БД
+			log.Error(err.Error())
+
+			w.WriteHeader(422)
+			render.JSON(w, r, resp.Error("failed to add item in cart"))
+
+			return
+		}
+
+		log.Info("item successfully added")
+
+		render.JSON(w, r, resp.OK())
 	}
 }
