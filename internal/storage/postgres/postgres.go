@@ -40,7 +40,6 @@ func (s *Storage) GetShopList() (string, error) {
 	var shopList string
 	for qrResult.Next() {
 		if err := qrResult.Scan(&shopList); err != nil {
-			fmt.Println(err)
 			return "", fmt.Errorf("%s: %w", op, err)
 		}
 	}

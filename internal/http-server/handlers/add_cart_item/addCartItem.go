@@ -2,11 +2,11 @@ package addCartItem
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
+	"portal/internal/storage"
 
 	"log/slog"
 
@@ -75,19 +75,19 @@ func New(log *slog.Logger, cartItemAdder CartItemAdder) http.HandlerFunc {
 		}
 
 		err = cartItemAdder.AddCartItem(req.ItemID, req.Quantity)
+
+		// Обработка недоступности указанного item_id для заказа
+		if errors.As(err, &storage.ErrItemUnavailable) {
+			log.Error(err.Error())
+
+			w.WriteHeader(406)
+			render.JSON(w, r, resp.Error("item is not available"))
+
+			return
+		}
+
+		// Обработка общего случая ошибки БД
 		if err != nil {
-			// Обработка недоступности указанного item_id. Вложена внутрь, чтобы не наткнуться на разыменование nil ошибки
-			if err.Error() == string("storage.postgres.AddCartItem: pq: Item with item_id = "+fmt.Sprint(req.ItemID)+" is not available") {
-
-				log.Error(err.Error())
-
-				w.WriteHeader(406)
-				render.JSON(w, r, resp.Error("item is not available"))
-
-				return
-			}
-
-			// Обработка общего случая ошибки БД
 			log.Error(err.Error())
 
 			w.WriteHeader(422)

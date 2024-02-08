@@ -34,6 +34,21 @@ CREATE TABLE cart(
 
 CREATE FUNCTION add_cart_item(int, int) RETURNS void AS
 $$
+BEGIN
+	IF (SELECT is_available FROM item WHERE item_id = $1) = FALSE THEN
+		RAISE EXCEPTION 'Item with selected item_id is not available for order';
+	ELSE
+		INSERT INTO in_cart_item(item_id, quantity)
+		VALUES($1, $2)
+		ON CONFLICT (item_id) DO UPDATE SET quantity = in_cart_item.quantity + $2;
+	END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+
+--Пример с DECLARE
+CREATE FUNCTION add_cart_item(int, int) RETURNS void AS
+$$
 DECLARE
 	err text = 'Item with item_id = ' || $1 || ' is not available';
 BEGIN

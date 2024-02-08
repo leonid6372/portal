@@ -3,6 +3,5 @@ package storage
 import "errors"
 
 var (
-	ErrWrongAuth = errors.New("login or password is incorrect")
-	ErrEmptyCart = errors.New("cart is empty")
+	ErrItemUnavailable = errors.New("Item with selected item_id is not available for order")
 )
