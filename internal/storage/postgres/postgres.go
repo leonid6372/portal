@@ -12,6 +12,7 @@ import (
 const (
 	qrGetShopList = `SELECT jsonb_agg(item) FROM item`
 	qrAddCartItem = `SELECT add_cart_item($1, $2)`
+	qrGetUser     = `SELECT "password" FROM "user" WHERE login = $1`
 )
 
 type Storage struct {
@@ -56,4 +57,8 @@ func (s *Storage) AddCartItem(item_id, quantity int) error {
 	}
 
 	return nil
+}
+
+func (s *Storage) GetUser(login, password string) (bool, error) {
+	return true, nil
 }

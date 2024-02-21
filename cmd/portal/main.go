@@ -10,6 +10,8 @@ import (
 
 	addCartItem "portal/internal/http-server/handlers/add_cart_item"
 	getShopList "portal/internal/http-server/handlers/get_shop_list"
+	logIn "portal/internal/http-server/handlers/log_in"
+	"portal/internal/lib/jwt"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
 	"syscall"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/jwtauth/v5"
 )
 
 const (
@@ -24,6 +27,10 @@ const (
 	logLVLDebug = "debug"
 	logLVLWarn  = "warning"
 	logLVLError = "error"
+)
+
+var (
+	tokenAuth *jwtauth.JWTAuth
 )
 
 func main() {
@@ -44,8 +51,38 @@ func main() {
 	router.Use(middleware.Recoverer) // Если где-то внутри сервера (обработчика запроса) произойдет паника, приложение не должно упасть
 	router.Use(middleware.URLFormat) // Парсер URLов поступающих запросов
 
-	router.Get("/api/get_shop_list", getShopList.New(log, storage))
-	router.Post("/api/add_cart_item", addCartItem.New(log, storage))
+	// Инициализация шаблона для построения токенов по секрету и типу шифрования
+	tokenAuth, _ = jwt.Init()
+
+	// Protected routes
+	router.Group(func(router chi.Router) {
+		// Seek, verify and validate JWT tokens
+		router.Use(jwtauth.Verifier(tokenAuth))
+
+		// Handle valid / invalid tokens. In this example, we use
+		// the provided authenticator middleware, but you can write your
+		// own very easily, look at the Authenticator method in jwtauth.go
+		// and tweak it, its not scary.
+		router.Use(jwtauth.Authenticator(tokenAuth))
+
+		/* EXAMPLE: router.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
+			_, claims, _ := jwtauth.FromContext(r.Context())
+			w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
+		})*/
+		router.Get("/api/get_shop_list", getShopList.New(log, storage))
+		router.Post("/api/add_cart_item", addCartItem.New(log, storage))
+	})
+
+	// Public routes
+	router.Group(func(r chi.Router) {
+		/* EXAMPLE: router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("welcome anonymous"))
+		})*/
+		router.Get("/api/log_in", logIn.New(log, storage, tokenAuth))
+	})
+
+	/*router.Get("/api/get_shop_list", getShopList.New(log, storage))
+	router.Post("/api/add_cart_item", addCartItem.New(log, storage))*/
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 
