@@ -28,7 +28,7 @@ type HTTPServer struct {
 
 func MustLoad() *Config {
 	//configPath := os.Getenv("CONFIG_PATH") Вариант для прода через системный путь
-	configPath := "C:/Users/Leonid/Desktop/portal/config/local.yaml" // Локальный путь
+	configPath := "portal/config/local.yaml" // Локальный путь
 	if configPath == "" {
 		log.Fatal("CONFIG_PATH is not set")
 	}
