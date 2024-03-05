@@ -19,7 +19,7 @@ type UserData struct {
 
 const (
 	qrGetUserById = `SELECT "login", "balance" FROM "user" WHERE user_id = $1`
-	qrUserAuth    = `SELECT "userId", "login", "balance" FROM "user" WHERE login = $1`
+	qrUserAuth    = `SELECT "user_id", "login", "balance" FROM "user" WHERE login = $1`
 
 	password = "123"
 )
@@ -31,8 +31,10 @@ func (u *User) GetUserById() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
-	if err := qrResult.Scan(&u.userLogin, &u.balance); err != nil {
-		return false, fmt.Errorf("%s: %w", op, err)
+	for qrResult.Next() {
+		if err := qrResult.Scan(&u.userLogin, &u.balance); err != nil {
+			return false, fmt.Errorf("%s: %w", op, err)
+		}
 	}
 	return true, nil
 }
@@ -43,10 +45,11 @@ func (u *User) UserAuth(db *db.Storage, Login string, Password string) (bool, er
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
-	if err := qrResult.Scan(&u.userId, &u.userLogin, &u.balance); err != nil {
-		return false, fmt.Errorf("%s: %w", op, err)
+	for qrResult.Next() {
+		if err := qrResult.Scan(&u.userId, &u.userLogin, &u.balance); err != nil {
+			return false, fmt.Errorf("%s: %w", op, err)
+		}
 	}
-	fmt.Printf("%s", Password)
 	if Password != password {
 		return false, fmt.Errorf("%s: %w", op, errHandler.ErrPassword)
 	}

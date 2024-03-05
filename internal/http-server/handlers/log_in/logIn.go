@@ -75,9 +75,11 @@ func New(log *slog.Logger, storage *postgres.Storage, tokenAuth *jwtauth.JWTAuth
 		}
 		u := &entities.User{}
 		fmt.Printf("%s", req.Password)
-		status, _ := u.UserAuth(storage, req.Login, req.Password)
+		status, err := u.UserAuth(storage, req.Login, req.Password)
 
 		if !status {
+			w.WriteHeader(400)
+			render.JSON(w, r, resp.Error(err.Error()))
 			return
 		}
 
