@@ -16,7 +16,7 @@ const (
 )
 
 type Storage struct {
-	db *sql.DB
+	Db *sql.DB
 }
 
 func New(cfg config.SQLStorage) (*Storage, error) {
@@ -27,13 +27,13 @@ func New(cfg config.SQLStorage) (*Storage, error) {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return &Storage{db: db}, nil
+	return &Storage{Db: db}, nil
 }
 
 func (s *Storage) GetShopList() (string, error) {
 	const op = "storage.postgres.GetShopList" // Имя текущей функции для логов и ошибок
 
-	qrResult, err := s.db.Query(qrGetShopList)
+	qrResult, err := s.Db.Query(qrGetShopList)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
@@ -51,7 +51,7 @@ func (s *Storage) GetShopList() (string, error) {
 func (s *Storage) AddCartItem(item_id, quantity int) error {
 	const op = "storage.postgres.AddCartItem"
 
-	_, err := s.db.Query(qrAddCartItem, item_id, quantity)
+	_, err := s.Db.Query(qrAddCartItem, item_id, quantity)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}

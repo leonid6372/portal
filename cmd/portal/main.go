@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"portal/internal/config"
-
 	addCartItem "portal/internal/http-server/handlers/add_cart_item"
 	getShopList "portal/internal/http-server/handlers/get_shop_list"
 	logIn "portal/internal/http-server/handlers/log_in"
@@ -69,8 +68,7 @@ func main() {
 			_, claims, _ := jwtauth.FromContext(r.Context())
 			w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
 		})*/
-		router.Get("/api/get_shop_list", getShopList.New(log, storage))
-		router.Post("/api/add_cart_item", addCartItem.New(log, storage))
+
 	})
 
 	// Public routes
@@ -79,6 +77,8 @@ func main() {
 			w.Write([]byte("welcome anonymous"))
 		})*/
 		router.Get("/api/log_in", logIn.New(log, storage, tokenAuth))
+		router.Post("/api/add_cart_item", addCartItem.New(log, storage))
+		router.Get("/api/get_shop_list", getShopList.New(log, storage))
 	})
 
 	/*router.Get("/api/get_shop_list", getShopList.New(log, storage))

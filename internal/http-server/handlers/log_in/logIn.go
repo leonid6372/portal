@@ -2,12 +2,15 @@ package logIn
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/jwt"
 	"portal/internal/lib/logger/sl"
+	"portal/internal/storage/postgres"
+	"portal/internal/storage/postgres/entities"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/jwtauth/v5"
@@ -25,11 +28,7 @@ type Response struct {
 	Token string `json:"token"`
 }
 
-type UserGetter interface {
-	GetUser(login, password string) (bool, error)
-}
-
-func New(log *slog.Logger, userGetter UserGetter, tokenAuth *jwtauth.JWTAuth) http.HandlerFunc {
+func New(log *slog.Logger, storage *postgres.Storage, tokenAuth *jwtauth.JWTAuth) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.logIn.New"
 
@@ -74,14 +73,14 @@ func New(log *slog.Logger, userGetter UserGetter, tokenAuth *jwtauth.JWTAuth) ht
 
 			return
 		}
+		u := &entities.User{}
+		fmt.Printf("%s", req.Password)
+		status, _ := u.UserAuth(storage, req.Login, req.Password)
 
-		// Проверка данных пользователя по БД
-		//ok, err := userGetter.GetUser(req.Login, req.Password)
-		/*if err != nil {
+		if !status {
+			return
+		}
 
-		}*/
-
-		// Создание токена и отправка полем JSON в ответ запроса
 		token, _ := jwt.New(tokenAuth)
 		responseOK(w, r, token)
 	}
