@@ -9,12 +9,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const (
-	qrGetShopList = `SELECT jsonb_agg(item) FROM item`
-	qrAddCartItem = `SELECT add_cart_item($1, $2)`
-	qrGetUser     = `SELECT "password" FROM "user" WHERE login = $1`
-)
-
 type Storage struct {
 	Db *sql.DB
 }
@@ -28,37 +22,4 @@ func New(cfg config.SQLStorage) (*Storage, error) {
 	}
 
 	return &Storage{Db: db}, nil
-}
-
-func (s *Storage) GetShopList() (string, error) {
-	const op = "storage.postgres.GetShopList" // Имя текущей функции для логов и ошибок
-
-	qrResult, err := s.Db.Query(qrGetShopList)
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", op, err)
-	}
-
-	var shopList string
-	for qrResult.Next() {
-		if err := qrResult.Scan(&shopList); err != nil {
-			return "", fmt.Errorf("%s: %w", op, err)
-		}
-	}
-
-	return shopList, nil
-}
-
-func (s *Storage) AddCartItem(item_id, quantity int) error {
-	const op = "storage.postgres.AddCartItem"
-
-	_, err := s.Db.Query(qrAddCartItem, item_id, quantity)
-	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
-	}
-
-	return nil
-}
-
-func (s *Storage) GetUser(login, password string) (bool, error) {
-	return true, nil
 }

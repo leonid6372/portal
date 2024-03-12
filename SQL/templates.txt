@@ -61,3 +61,8 @@ BEGIN
 	END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+create table place(
+placeId serial primary key,
+name varchar(64),
+properties text);

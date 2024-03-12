@@ -1,4 +1,4 @@
-package logIn
+package reservation
 
 import (
 	"errors"
@@ -6,30 +6,28 @@ import (
 	"log/slog"
 	"net/http"
 	resp "portal/internal/lib/api/response"
-	"portal/internal/lib/jwt"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities"
 
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/jwtauth/v5"
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 )
 
 type Request struct {
-	Login    string `json:"login,omitempty" validate:"required"`
-	Password string `json:"password,omitempty" validate:"required"`
+	PlaceId int    `json:"place_id,omitempty" validate:"required"`
+	Start   string `json:"start,omitempty" validate:"required"`
+	Finish  string `json:"finish,omitempty" validate:"required"`
 }
 
 type Response struct {
 	resp.Response
-	Token string `json:"token"`
 }
 
-func New(log *slog.Logger, storage *postgres.Storage, tokenAuth *jwtauth.JWTAuth) http.HandlerFunc {
+func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.logIn.New"
+		const op = "handlers.reservation.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -72,23 +70,28 @@ func New(log *slog.Logger, storage *postgres.Storage, tokenAuth *jwtauth.JWTAuth
 
 			return
 		}
-		u := &entities.User{}
-		status, err := u.UserAuth(storage, req.Login, req.Password)
 
+		res := &entities.Reservation{}
+		status, err := res.ReservationInsert(storage, req.PlaceId, req.Start, req.Finish)
 		if !status {
 			w.WriteHeader(400)
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
 		}
+		// Обработка недоступности указанного place_id
 
-		token, _ := jwt.New(tokenAuth)
-		responseOK(w, r, token)
+		// Обработка общего случая ошибки БД
+		if err != nil {
+			log.Error(err.Error())
+
+			w.WriteHeader(422)
+			render.JSON(w, r, resp.Error("failed to add item in cart"))
+
+			return
+		}
+
+		log.Info("item successfully added")
+
+		render.JSON(w, r, resp.OK())
 	}
-}
-
-func responseOK(w http.ResponseWriter, r *http.Request, token string) {
-	render.JSON(w, r, Response{
-		Response: resp.OK(),
-		Token:    token,
-	})
 }

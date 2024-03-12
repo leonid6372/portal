@@ -2,7 +2,6 @@ package entities
 
 import (
 	"fmt"
-	"portal/internal/config"
 	errHandler "portal/internal/storage"
 	db "portal/internal/storage/postgres"
 )
@@ -15,6 +14,8 @@ type User struct {
 
 type UserData struct {
 	User
+
+	// дополнительные значения по типу данных с 1с
 }
 
 const (
@@ -24,10 +25,9 @@ const (
 	password = "123"
 )
 
-func (u *User) GetUserById() (bool, error) {
+func (u *User) GetUserById(db *db.Storage) (bool, error) {
 	const op = "storage.postgres.entities.getUserById" // Имя текущей функции для логов и ошибок
-	s, _ := db.New(config.SQLStorage{})
-	qrResult, err := s.Db.Query(qrGetUserById, u.userId)
+	qrResult, err := db.Db.Query(qrGetUserById, u.userId)
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
