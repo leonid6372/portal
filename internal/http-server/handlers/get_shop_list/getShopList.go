@@ -3,7 +3,7 @@ package getShopList
 import (
 	"net/http"
 	"portal/internal/storage/postgres"
-	"portal/internal/storage/postgres/entities"
+	"portal/internal/storage/postgres/entities/Shop"
 
 	"log/slog"
 
@@ -26,7 +26,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
-		i := &entities.Item{}
+		var i *Shop.Item
 		shopList, err := i.GetShopList(storage)
 		if err != nil {
 			log.Error("failed to get shop list")

@@ -1,4 +1,4 @@
-package entities
+package Shop
 
 import (
 	"fmt"
@@ -6,18 +6,18 @@ import (
 )
 
 type Item struct {
-	Item_id     int    `json:"item_id" validate:"required"`
+	ItemID      int    `json:"item_id" validate:"required"`
 	Name        string `json:"name" validate:"required"`
 	Description string `json:"description"`
 	Price       int    `json:"price"`
-	Photo_path  string `json:"photo_path"`
-	Is_active   bool   `json:"is_active" validate:"required"`
+	PhotoPath   string `json:"photo_path"`
+	IsActive    bool   `json:"is_active" validate:"required"`
 }
 
-type In_Cart_Item struct {
-	In_cart_item_id int
-	Item_id         int
-	Quantity        int
+type InCartItem struct {
+	InCartItemID int
+	ItemId       int
+	Quantity     int
 }
 
 const (
@@ -28,7 +28,7 @@ const (
 func (i *Item) GetShopList(db *db.Storage) (string, error) {
 	const op = "storage.postgres.entities.GetShopList" // Имя текущей функции для логов и ошибок
 
-	qrResult, err := db.Db.Query(qrGetShopList)
+	qrResult, err := db.DB.Query(qrGetShopList)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
@@ -43,10 +43,10 @@ func (i *Item) GetShopList(db *db.Storage) (string, error) {
 	return shopList, nil
 }
 
-func (c *In_Cart_Item) AddCartItem(db *db.Storage, Item_id, Quantity int) error {
-	const op = "storage.postgres.AddCartItem"
+func (c *InCartItem) Add(db *db.Storage, Item_id, Quantity int) error {
+	const op = "storage.postgres.Add"
 
-	_, err := db.Db.Query(qrAddCartItem, Item_id, Quantity)
+	_, err := db.DB.Query(qrAddCartItem, Item_id, Quantity)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}

@@ -1,4 +1,4 @@
-package entities
+package Reservation
 
 import (
 	"fmt"
@@ -7,18 +7,18 @@ import (
 )
 
 type Place struct {
-	placeId    int
-	name       string
-	properties string
-	isAvalible bool
+	PlaceID    int
+	Name       string
+	Properties string
+	IsAvalible bool
 }
 
 type Reservation struct {
-	reservationId int
-	placeId       int
-	start         pgtype.Timestamp
-	end           pgtype.Timestamp
-	userId        int
+	ReservationID int
+	PlaceID       int
+	Start         pgtype.Timestamp
+	End           pgtype.Timestamp
+	UserID        int
 }
 
 const (
@@ -30,21 +30,21 @@ const (
 
 func (p *Place) GetPlaceById(db *db.Storage) (bool, error) {
 	const op = "storage.postgres.entities.getPlaceById" // Имя текущей функции для логов и ошибок
-	qrResult, err := db.Db.Query(qrGetPlaceById, p.placeId)
+	qrResult, err := db.DB.Query(qrGetPlaceById, p.PlaceID)
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
 	for qrResult.Next() {
-		if err := qrResult.Scan(&p.name, &p.properties); err != nil {
+		if err := qrResult.Scan(&p.Name, &p.Properties); err != nil {
 			return false, fmt.Errorf("%s: %w", op, err)
 		}
 	}
 	return true, nil
 }
 
-func (r *Reservation) ReservationInsert(db *db.Storage, PlaceId int, Start string, End string) (bool, error) {
+func (r *Reservation) ReservationInsert(db *db.Storage, placeID int, start, finish string) (bool, error) {
 	const op = "storage.postgres.entities.reservationInsert" // Имя текущей функции для логов и ошибок
-	_, err := db.Db.Query(qrReservationInsert, PlaceId, Start, End)
+	_, err := db.DB.Query(qrReservationInsert, placeID, start, finish)
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
@@ -54,7 +54,7 @@ func (r *Reservation) ReservationInsert(db *db.Storage, PlaceId int, Start strin
 func (p *Place) GetActualPlaceList(db *db.Storage) (string, error) {
 	const op = "storage.postgres.GetActualPlaceList" // Имя текущей функции для логов и ошибок
 
-	qrResult, err := db.Db.Query(qrGetActualPlaceList)
+	qrResult, err := db.DB.Query(qrGetActualPlaceList)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}

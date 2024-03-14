@@ -10,7 +10,7 @@ import (
 )
 
 type Storage struct {
-	Db *sql.DB
+	DB *sql.DB
 }
 
 func New(cfg config.SQLStorage) (*Storage, error) {
@@ -21,5 +21,5 @@ func New(cfg config.SQLStorage) (*Storage, error) {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return &Storage{Db: db}, nil
+	return &Storage{DB: db}, nil
 }

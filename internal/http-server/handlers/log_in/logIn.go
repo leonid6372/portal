@@ -9,7 +9,7 @@ import (
 	"portal/internal/lib/jwt"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
-	"portal/internal/storage/postgres/entities"
+	"portal/internal/storage/postgres/entities/User"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/jwtauth/v5"
@@ -72,7 +72,7 @@ func New(log *slog.Logger, storage *postgres.Storage, tokenAuth *jwtauth.JWTAuth
 
 			return
 		}
-		u := &entities.User{}
+		var u *User.User
 		status, err := u.UserAuth(storage, req.Login, req.Password)
 
 		if !status {

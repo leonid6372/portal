@@ -1,4 +1,4 @@
-package entities
+package User
 
 import (
 	"fmt"
@@ -7,50 +7,44 @@ import (
 )
 
 type User struct {
-	userId    int
-	userLogin string
-	balance   int
-}
-
-type UserData struct {
-	User
-
-	// дополнительные значения по типу данных с 1с
+	UserID    int
+	UserLogin string
+	Balance   int
 }
 
 const (
 	qrGetUserById = `SELECT "login", "balance" FROM "user" WHERE user_id = $1`
 	qrUserAuth    = `SELECT "user_id", "login", "balance" FROM "user" WHERE login = $1`
 
-	password = "123"
+	globalPassword = "123"
 )
 
 func (u *User) GetUserById(db *db.Storage) (bool, error) {
 	const op = "storage.postgres.entities.getUserById" // Имя текущей функции для логов и ошибок
-	qrResult, err := db.Db.Query(qrGetUserById, u.userId)
+	qrResult, err := db.DB.Query(qrGetUserById, u.UserID)
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
 	for qrResult.Next() {
-		if err := qrResult.Scan(&u.userLogin, &u.balance); err != nil {
+		if err := qrResult.Scan(&u.UserLogin, &u.Balance); err != nil {
 			return false, fmt.Errorf("%s: %w", op, err)
 		}
 	}
 	return true, nil
 }
 
-func (u *User) UserAuth(db *db.Storage, Login string, Password string) (bool, error) {
+func (u *User) UserAuth(db *db.Storage, login string, password string) (bool, error) {
 	const op = "storage.postgres.entities.userAuth" // Имя текущей функции для логов и ошибок
-	qrResult, err := db.Db.Query(qrUserAuth, Login)
+	qrResult, err := db.DB.Query(qrUserAuth, login)
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
 	for qrResult.Next() {
-		if err := qrResult.Scan(&u.userId, &u.userLogin, &u.balance); err != nil {
+		if err := qrResult.Scan(&u.UserID, &u.UserLogin, &u.Balance); err != nil {
 			return false, fmt.Errorf("%s: %w", op, err)
 		}
 	}
-	if Password != password {
+	if password != globalPassword {
 		return false, fmt.Errorf("%s: %w", op, errHandler.ErrPassword)
 	}
 	return true, nil

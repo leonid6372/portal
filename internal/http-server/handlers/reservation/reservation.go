@@ -8,7 +8,7 @@ import (
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
-	"portal/internal/storage/postgres/entities"
+	"portal/internal/storage/postgres/entities/Reservation"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
@@ -16,7 +16,7 @@ import (
 )
 
 type Request struct {
-	PlaceId int    `json:"place_id,omitempty" validate:"required"`
+	PlaceID int    `json:"place_id,omitempty" validate:"required"`
 	Start   string `json:"start,omitempty" validate:"required"`
 	Finish  string `json:"finish,omitempty" validate:"required"`
 }
@@ -71,8 +71,8 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
-		res := &entities.Reservation{}
-		status, err := res.ReservationInsert(storage, req.PlaceId, req.Start, req.Finish)
+		var res *Reservation.Reservation
+		status, err := res.ReservationInsert(storage, req.PlaceID, req.Start, req.Finish)
 		if !status {
 			w.WriteHeader(400)
 			render.JSON(w, r, resp.Error(err.Error()))

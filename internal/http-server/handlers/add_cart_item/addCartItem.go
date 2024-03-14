@@ -7,7 +7,7 @@ import (
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
-	"portal/internal/storage/postgres/entities"
+	"portal/internal/storage/postgres/entities/shop"
 
 	"log/slog"
 
@@ -70,8 +70,8 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 			return
 		}
-		c := entities.In_Cart_Item{}
-		err = c.AddCartItem(storage, req.ItemID, req.Quantity)
+		var c *Shop.InCartItem
+		err = c.Add(storage, req.ItemID, req.Quantity)
 
 		// Обработка общего случая ошибки БД
 		if err != nil {

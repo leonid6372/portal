@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/go-chi/jwtauth/v5"
 	"log/slog"
 	"net/http"
 	"os"
@@ -20,7 +21,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/jwtauth/v5"
 )
 
 const (
@@ -82,7 +82,7 @@ func main() {
 		router.Post("/api/add_cart_item", addCartItem.New(log, storage))
 		router.Get("/api/get_shop_list", getShopList.New(log, storage))
 		router.Post("/api/reservation", reservation.New(log, storage))
-		router.Get("/api/get_reservation_list", get_reservation_list.New(log, storage))
+		router.Get("/api/get_reservation_list", getReservationList.New(log, storage))
 	})
 
 	/*router.Get("/api/get_shop_list", getShopList.New(log, storage))
