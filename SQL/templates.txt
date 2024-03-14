@@ -61,3 +61,37 @@ BEGIN
 	END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+create table place(
+placeId serial primary key,
+name varchar(64),
+properties text);
+
+create table reservation(
+reservationid serial primary key,
+placeid int,
+start timestamp,
+finish timestamp,
+user_id int);
+
+CREATE VIEW ActualPlaces AS
+(SELECT p.placeid, p.name, p.properties, true AS isAvalible FROM place AS p
+	JOIN reservation as r ON
+	(p.placeid = r.placeid AND
+	(r.start > localtimestamp OR r.finish < localtimestamp))
+	OR (p.placeid != r.placeid)
+	EXCEPT
+	SELECT p.placeid, p.name, p.properties, true AS isAvalible FROM place AS p
+	JOIN reservation as r ON
+	p.placeid = r.placeid AND
+	(r.start <= localtimestamp OR r.finish >= localtimestamp))
+
+	UNION
+
+	SELECT p.placeid, p.name, p.properties, false AS isAvalible FROM place AS p
+	JOIN reservation as r ON
+	p.placeid = r.placeid AND
+	(r.start <= localtimestamp OR r.finish >= localtimestamp)
+
+	order by placeid;
+

@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -28,7 +29,7 @@ type HTTPServer struct {
 
 func MustLoad() *Config {
 	//configPath := os.Getenv("CONFIG_PATH") Вариант для прода через системный путь
-	configPath := "C:/Users/Leonid/Desktop/portal/config/local.yaml" // Локальный путь
+	configPath, _ := filepath.Abs("../portal/config/local.yaml") // Относительный путь
 	if configPath == "" {
 		log.Fatal("CONFIG_PATH is not set")
 	}

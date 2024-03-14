@@ -2,15 +2,17 @@ package main
 
 import (
 	"context"
+	"github.com/go-chi/jwtauth/v5"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"portal/internal/config"
-
 	addCartItem "portal/internal/http-server/handlers/add_cart_item"
+	"portal/internal/http-server/handlers/get_reservation_list"
 	getShopList "portal/internal/http-server/handlers/get_shop_list"
 	logIn "portal/internal/http-server/handlers/log_in"
+	"portal/internal/http-server/handlers/reservation"
 	"portal/internal/lib/jwt"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
@@ -19,7 +21,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/jwtauth/v5"
 )
 
 const (
@@ -69,8 +70,7 @@ func main() {
 			_, claims, _ := jwtauth.FromContext(r.Context())
 			w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
 		})*/
-		router.Get("/api/get_shop_list", getShopList.New(log, storage))
-		router.Post("/api/add_cart_item", addCartItem.New(log, storage))
+
 	})
 
 	// Public routes
@@ -79,6 +79,10 @@ func main() {
 			w.Write([]byte("welcome anonymous"))
 		})*/
 		router.Get("/api/log_in", logIn.New(log, storage, tokenAuth))
+		router.Post("/api/add_cart_item", addCartItem.New(log, storage))
+		router.Get("/api/get_shop_list", getShopList.New(log, storage))
+		router.Post("/api/reservation", reservation.New(log, storage))
+		router.Get("/api/get_reservation_list", getReservationList.New(log, storage))
 	})
 
 	/*router.Get("/api/get_shop_list", getShopList.New(log, storage))

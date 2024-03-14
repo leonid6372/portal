@@ -1,9 +1,9 @@
-package getShopList
+package getReservationList
 
 import (
 	"net/http"
 	"portal/internal/storage/postgres"
-	"portal/internal/storage/postgres/entities/Shop"
+	"portal/internal/storage/postgres/entities/Reservation"
 
 	"log/slog"
 
@@ -26,8 +26,8 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
-		var i *Shop.Item
-		shopList, err := i.GetShopList(storage)
+		var p *Reservation.Place
+		placeList, err := p.GetActualPlaceList(storage)
 		if err != nil {
 			log.Error("failed to get shop list")
 
@@ -39,7 +39,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 		log.Info("shop list gotten")
 
-		responseOK(w, r, shopList)
+		responseOK(w, r, placeList)
 	}
 }
 

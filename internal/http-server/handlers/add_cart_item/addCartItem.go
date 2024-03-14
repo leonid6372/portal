@@ -6,7 +6,8 @@ import (
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
-	"portal/internal/storage"
+	"portal/internal/storage/postgres"
+	"portal/internal/storage/postgres/entities/shop"
 
 	"log/slog"
 
@@ -24,11 +25,7 @@ type Response struct {
 	resp.Response
 }
 
-type CartItemAdder interface {
-	AddCartItem(item_id, quantity int) error
-}
-
-func New(log *slog.Logger, cartItemAdder CartItemAdder) http.HandlerFunc {
+func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.addCartItem.New"
 
@@ -73,18 +70,8 @@ func New(log *slog.Logger, cartItemAdder CartItemAdder) http.HandlerFunc {
 
 			return
 		}
-
-		err = cartItemAdder.AddCartItem(req.ItemID, req.Quantity)
-
-		// Обработка недоступности указанного item_id для заказа
-		if errors.As(err, &storage.ErrItemUnavailable) {
-			log.Error(err.Error())
-
-			w.WriteHeader(406)
-			render.JSON(w, r, resp.Error("item is not available"))
-
-			return
-		}
+		var c *Shop.InCartItem
+		err = c.Add(storage, req.ItemID, req.Quantity)
 
 		// Обработка общего случая ошибки БД
 		if err != nil {
