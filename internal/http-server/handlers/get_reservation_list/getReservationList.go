@@ -15,12 +15,12 @@ import (
 
 type Response struct {
 	resp.Response
-	ShopList string `json:"shop_list"`
+	ReservationList string `json:"reservation_list"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.getShopList.New"
+		const op = "handlers.getReservationList.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -29,15 +29,15 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		var p *Reservation.Place
 		placeList, err := p.GetActualPlaceList(storage)
 		if err != nil {
-			log.Error("failed to get shop list")
+			log.Error("failed to get reservation list")
 
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get shop list"))
+			render.JSON(w, r, resp.Error("failed to get reservation list"))
 
 			return
 		}
 
-		log.Info("shop list gotten")
+		log.Info("actual reservation list gotten")
 
 		responseOK(w, r, placeList)
 	}
@@ -46,6 +46,6 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 func responseOK(w http.ResponseWriter, r *http.Request, shopList string) {
 	render.JSON(w, r, Response{
 		Response: resp.OK(),
-		ShopList: shopList,
+		ReservationList: reservationList,
 	})
 }
