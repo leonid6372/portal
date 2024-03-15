@@ -43,7 +43,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, shopList string) {
+func responseOK(w http.ResponseWriter, r *http.Request, reservationList string) {
 	render.JSON(w, r, Response{
 		Response: resp.OK(),
 		ReservationList: reservationList,
