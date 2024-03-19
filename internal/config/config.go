@@ -3,7 +3,6 @@ package config
 import (
 	"log"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -14,6 +13,7 @@ type Config struct {
 	LogLVL     string `yaml:"log_lvl" env-default:"info"`
 	SQLStorage `yaml:"sql_storage"`
 	HTTPServer `yaml:"http_server"`
+	TokenTTL   time.Duration `yaml:"token_ttl" end-default:2h"`
 }
 
 type SQLStorage struct {
@@ -29,7 +29,7 @@ type HTTPServer struct {
 
 func MustLoad() *Config {
 	//configPath := os.Getenv("CONFIG_PATH") Вариант для прода через системный путь
-	configPath, _ := filepath.Abs("../portal/config/local.yaml") // Относительный путь
+	configPath := "C:/Users/Leonid/Desktop/portal/config/local.yaml" // Локальный путь
 	if configPath == "" {
 		log.Fatal("CONFIG_PATH is not set")
 	}

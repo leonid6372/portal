@@ -1,9 +1,16 @@
-package Reservation
+package reservation
 
 import (
 	"fmt"
+	"portal/internal/storage/postgres"
+
 	"github.com/jackc/pgx/v5/pgtype"
-	db "portal/internal/storage/postgres"
+)
+
+const (
+	qrGetPlaceById       = `SELECT name, properties FROM place WHERE place_id = $1`
+	qrReservationInsert  = `INSERT INTO reservation (place_id, start, finish, user_id) VALUES ($1, $2, $3, 1)` // сделать $4
+	qrGetActualPlaceList = `SELECT jsonb_agg(actual_places) FROM actual_places;`
 )
 
 type Place struct {
@@ -13,48 +20,27 @@ type Place struct {
 	IsAvalible bool
 }
 
-type Reservation struct {
-	ReservationID int
-	PlaceID       int
-	Start         pgtype.Timestamp
-	End           pgtype.Timestamp
-	UserID        int
-}
+func (p *Place) GetPlaceById(storage *postgres.Storage) (bool, error) {
+	const op = "storage.postgres.reservation.getPlaceById" // Имя текущей функции для логов и ошибок
 
-const (
-	qrGetPlaceById      = `SELECT name, properties FROM place WHERE place_id = $1`
-	qrReservationInsert = `INSERT INTO reservation (place_id, start, end, user_id) VALUES ($1, $2, $3, 1)`
-
-	qrGetActualPlaceList = `SELECT jsonb_agg(ActualPlaces) FROM ActualPlaces;`
-)
-
-func (p *Place) GetPlaceById(db *db.Storage) (bool, error) {
-	const op = "storage.postgres.entities.getPlaceById" // Имя текущей функции для логов и ошибок
-	qrResult, err := db.DB.Query(qrGetPlaceById, p.PlaceID)
+	qrResult, err := storage.DB.Query(qrGetPlaceById, p.PlaceID)
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
+
 	for qrResult.Next() {
 		if err := qrResult.Scan(&p.Name, &p.Properties); err != nil {
 			return false, fmt.Errorf("%s: %w", op, err)
 		}
 	}
+
 	return true, nil
 }
 
-func (r *Reservation) ReservationInsert(db *db.Storage, placeID int, start, finish string) (bool, error) {
-	const op = "storage.postgres.entities.reservationInsert" // Имя текущей функции для логов и ошибок
-	_, err := db.DB.Query(qrReservationInsert, placeID, start, finish)
-	if err != nil {
-		return false, fmt.Errorf("%s: %w", op, err)
-	}
-	return true, nil
-}
+func (p *Place) GetActualPlaceList(storage *postgres.Storage) (string, error) {
+	const op = "storage.postgres.reservation.GetActualPlaceList" // Имя текущей функции для логов и ошибок
 
-func (p *Place) GetActualPlaceList(db *db.Storage) (string, error) {
-	const op = "storage.postgres.GetActualPlaceList" // Имя текущей функции для логов и ошибок
-
-	qrResult, err := db.DB.Query(qrGetActualPlaceList)
+	qrResult, err := storage.DB.Query(qrGetActualPlaceList)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
@@ -67,4 +53,23 @@ func (p *Place) GetActualPlaceList(db *db.Storage) (string, error) {
 	}
 
 	return placeList, nil
+}
+
+type Reservation struct {
+	ReservationID int
+	PlaceID       int
+	Start         pgtype.Timestamp
+	End           pgtype.Timestamp
+	UserID        int
+}
+
+func (r *Reservation) ReservationInsert(storage *postgres.Storage, placeID int, start, finish string) (bool, error) {
+	const op = "storage.postgres.reservation.reservationInsert" // Имя текущей функции для логов и ошибок
+
+	_, err := storage.DB.Exec(qrReservationInsert, placeID, start, finish) // добавить userID
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return true, nil
 }

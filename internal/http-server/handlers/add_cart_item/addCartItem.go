@@ -6,6 +6,7 @@ import (
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
+	storageErrors "portal/internal/storage"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/shop"
 
@@ -70,8 +71,19 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 			return
 		}
-		var c *Shop.InCartItem
-		err = c.Add(storage, req.ItemID, req.Quantity)
+
+		var c *shop.InCartItem
+		err = c.AddCartItem(storage, req.ItemID, req.Quantity)
+
+		// Обработка недоступности указанного item_id для заказа
+		if errors.As(err, &storageErrors.ErrItemUnavailable) {
+			log.Error(err.Error())
+
+			w.WriteHeader(406)
+			render.JSON(w, r, resp.Error("item is not available"))
+
+			return
+		}
 
 		// Обработка общего случая ошибки БД
 		if err != nil {

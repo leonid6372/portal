@@ -5,8 +5,8 @@ CREATE TABLE "user"(
 );
 
 INSERT INTO "user"("1c", balance)
-VALUES ('{"login":"aa001", "test":"test"}'::jsonb, 100000),
-       ('{"login":"aa002", "test":"test"}'::jsonb, 0)
+VALUES ('{"username":"aa001", "test":"test"}'::jsonb, 100000),
+       ('{"username":"aa002", "test":"test"}'::jsonb, 0)
 
 CREATE TABLE item(
 	item_id SERIAL PRIMARY KEY,
@@ -30,6 +30,11 @@ CREATE TABLE cart(
 	user_id INT REFERENCES "user"(user_id) ON DELETE CASCADE,
 	is_active BOOL,
 	"date" DATE
+);
+
+CREATE TABLE refresh_token(
+	user_id INT UNIQUE REFERENCES "user"(user_id) ON DELETE CASCADE,
+	refresh_token_id varchar(50) UNIQUE
 );
 
 CREATE FUNCTION add_cart_item(int, int) RETURNS void AS
@@ -63,35 +68,34 @@ END;
 $$ LANGUAGE plpgsql;
 
 create table place(
-placeId serial primary key,
+place_id serial primary key,
 name varchar(64),
 properties text);
 
 create table reservation(
-reservationid serial primary key,
-placeid int,
+reservation_id serial primary key,
+place_id int REFERENCES place(place_id) ON DELETE CASCADE,
 start timestamp,
 finish timestamp,
-user_id int);
+user_id int REFERENCES "user"(user_id) ON DELETE CASCADE);
 
-CREATE VIEW ActualPlaces AS
-(SELECT p.placeid, p.name, p.properties, true AS isAvalible FROM place AS p
+CREATE VIEW actual_places AS
+(SELECT p.place_id, p.name, p.properties, true AS is_avalible FROM place AS p
 	JOIN reservation as r ON
-	(p.placeid = r.placeid AND
+	(p.place_id = r.place_id AND
 	(r.start > localtimestamp OR r.finish < localtimestamp))
-	OR (p.placeid != r.placeid)
+	OR (p.place_id != r.place_id)
 	EXCEPT
-	SELECT p.placeid, p.name, p.properties, true AS isAvalible FROM place AS p
+	SELECT p.place_id, p.name, p.properties, true AS is_avalible FROM place AS p
 	JOIN reservation as r ON
-	p.placeid = r.placeid AND
+	p.place_id = r.place_id AND
 	(r.start <= localtimestamp OR r.finish >= localtimestamp))
 
 	UNION
 
-	SELECT p.placeid, p.name, p.properties, false AS isAvalible FROM place AS p
+	SELECT p.place_id, p.name, p.properties, false AS is_avalible FROM place AS p
 	JOIN reservation as r ON
-	p.placeid = r.placeid AND
+	p.place_id = r.place_id AND
 	(r.start <= localtimestamp OR r.finish >= localtimestamp)
 
-	order by placeid;
-
+	order by place_id;
