@@ -21,7 +21,7 @@ type Place struct {
 }
 
 func (p *Place) GetPlaceById(storage *postgres.Storage) (bool, error) {
-	const op = "storage.postgres.reservation.getPlaceById" // Имя текущей функции для логов и ошибок
+	const op = "storage.postgres.entities.reservation.getPlaceById" // Имя текущей функции для логов и ошибок
 
 	qrResult, err := storage.DB.Query(qrGetPlaceById, p.PlaceID)
 	if err != nil {
@@ -38,7 +38,7 @@ func (p *Place) GetPlaceById(storage *postgres.Storage) (bool, error) {
 }
 
 func (p *Place) GetActualPlaceList(storage *postgres.Storage) (string, error) {
-	const op = "storage.postgres.reservation.GetActualPlaceList" // Имя текущей функции для логов и ошибок
+	const op = "storage.postgres.entities.reservation.GetActualPlaceList" // Имя текущей функции для логов и ошибок
 
 	qrResult, err := storage.DB.Query(qrGetActualPlaceList)
 	if err != nil {
@@ -64,7 +64,7 @@ type Reservation struct {
 }
 
 func (r *Reservation) ReservationInsert(storage *postgres.Storage, placeID int, start, finish string) (bool, error) {
-	const op = "storage.postgres.reservation.reservationInsert" // Имя текущей функции для логов и ошибок
+	const op = "storage.postgres.entities.reservation.reservationInsert" // Имя текущей функции для логов и ошибок
 
 	_, err := storage.DB.Exec(qrReservationInsert, placeID, start, finish) // добавить userID
 	if err != nil {

@@ -22,7 +22,7 @@ type Item struct {
 
 // Переписать под ORM
 func (i *Item) GetShopList(storage *postgres.Storage) (string, error) {
-	const op = "storage.postgres.entities.GetShopList" // Имя текущей функции для логов и ошибок
+	const op = "storage.postgres.entities.shop.GetShopList" // Имя текущей функции для логов и ошибок
 
 	qrResult, err := storage.DB.Query(qrGetShopList)
 	if err != nil {
@@ -46,7 +46,7 @@ type InCartItem struct {
 }
 
 func (c *InCartItem) AddCartItem(storage *postgres.Storage, itemID, quantity int) error {
-	const op = "storage.storage.postgres.Add"
+	const op = "storage.postgres.entities.shop.Add"
 
 	_, err := storage.DB.Exec(qrAddCartItem, itemID, quantity)
 	if err != nil {

@@ -22,7 +22,7 @@ type User struct {
 }
 
 func (u *User) GetUserById(storage *postgres.Storage) error {
-	const op = "storage.postgres.user.GetUserById" // Имя текущей функции для логов и ошибок
+	const op = "storage.postgres.entities.user.GetUserById" // Имя текущей функции для логов и ошибок
 
 	qrResult, err := storage.DB.Query(qrGetUserById, u.UserID)
 	if err != nil {
@@ -43,7 +43,7 @@ func (u *User) GetUserById(storage *postgres.Storage) error {
 
 // TO DO: Переписать под ORM
 func (u *User) ValidateUser(storage *postgres.Storage, username, password string) error {
-	const op = "storage.postgres.user.ValidateUser"
+	const op = "storage.postgres.entities.user.ValidateUser"
 
 	var correctPassword string
 	qrResult, err := storage.DB.Query(qrGetPassByUsername, username)
@@ -69,7 +69,7 @@ func (u *User) ValidateUser(storage *postgres.Storage, username, password string
 
 // TO DO: Переписать под ORM
 func (u *User) GetUserID(storage *postgres.Storage, username string) (int, error) {
-	const op = "storage.postgres.user.GetUserID"
+	const op = "storage.postgres.entities.user.GetUserID"
 
 	var userID int
 	qrResult, err := storage.DB.Query(qrGetUserIDByUsername, username)
@@ -95,7 +95,7 @@ type RefreshToken struct {
 }
 
 func (r *RefreshToken) ValidateRefreshTokenID(storage *postgres.Storage, username, refreshTokenID string) error {
-	const op = "storage.postgres.user.ValidateRefreshTokenID"
+	const op = "storage.postgres.entities.user.ValidateRefreshTokenID"
 
 	var userID int
 	qrResult, err := storage.DB.Query(qrGetUserIDByUsername, username)
@@ -129,7 +129,7 @@ func (r *RefreshToken) ValidateRefreshTokenID(storage *postgres.Storage, usernam
 }
 
 func (r *RefreshToken) StoreRefreshTokenID(storage *postgres.Storage, username, refreshTokenID string) error {
-	const op = "storage.postgres.user.StoreRefreshTokenID"
+	const op = "storage.postgres.entities.user.StoreRefreshTokenID"
 
 	var userID int
 	qrResult, err := storage.DB.Query(qrGetUserIDByUsername, username)

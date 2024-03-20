@@ -6,7 +6,7 @@ import (
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
-	storageErrors "portal/internal/storage"
+	storageHandler "portal/internal/storage"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/shop"
 
@@ -76,7 +76,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		err = c.AddCartItem(storage, req.ItemID, req.Quantity)
 
 		// Обработка недоступности указанного item_id для заказа
-		if errors.As(err, &storageErrors.ErrItemUnavailable) {
+		if errors.As(err, &storageHandler.ErrItemUnavailable) {
 			log.Error(err.Error())
 
 			w.WriteHeader(406)

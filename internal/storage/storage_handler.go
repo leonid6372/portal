@@ -1,4 +1,4 @@
-package storageErrors
+package storageHandler
 
 import "errors"
 
