@@ -1,51 +1,152 @@
-package User
+package user
 
 import (
 	"fmt"
-	errHandler "portal/internal/storage"
-	db "portal/internal/storage/postgres"
+	"portal/internal/storage/postgres"
+)
+
+const (
+	qrGetPassByUsername         = `SELECT "password" FROM "user" WHERE username = $1`
+	qrGetUserIDByUsername       = `SELECT user_id FROM "user" WHERE username = $1`
+	qrGetUserById               = `SELECT username, balance FROM "user" WHERE user_id = $1`
+	qrGetRefreshTokenIDByUserID = `SELECT refresh_token_id FROM refresh_token WHERE user_id = $1`
+	qrStoreRefreshTokenID       = `INSERT INTO refresh_token (user_id, refresh_token_id)
+								   VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE
+								   SET refresh_token_id = EXCLUDED.refresh_token_id`
 )
 
 type User struct {
-	UserID    int
-	UserLogin string
-	Balance   int
+	UserID   int
+	Username string
+	Balance  int
 }
 
-const (
-	qrGetUserById = `SELECT "login", "balance" FROM "user" WHERE user_id = $1`
-	qrUserAuth    = `SELECT "user_id", "login", "balance" FROM "user" WHERE login = $1`
+func (u *User) GetUserById(storage *postgres.Storage) error {
+	const op = "storage.postgres.entities.user.GetUserById" // Имя текущей функции для логов и ошибок
 
-	globalPassword = "123"
-)
-
-func (u *User) GetUserById(db *db.Storage) (bool, error) {
-	const op = "storage.postgres.entities.getUserById" // Имя текущей функции для логов и ошибок
-	qrResult, err := db.DB.Query(qrGetUserById, u.UserID)
+	qrResult, err := storage.DB.Query(qrGetUserById, u.UserID)
 	if err != nil {
-		return false, fmt.Errorf("%s: %w", op, err)
+		return fmt.Errorf("%s: %w", op, err)
 	}
-	for qrResult.Next() {
-		if err := qrResult.Scan(&u.UserLogin, &u.Balance); err != nil {
-			return false, fmt.Errorf("%s: %w", op, err)
-		}
+
+	// Проверка на пустой ответ
+	if !qrResult.Next() {
+		return fmt.Errorf("%s: wrong user_id", op)
 	}
-	return true, nil
+
+	if err := qrResult.Scan(&u.Username, &u.Balance); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }
 
-func (u *User) UserAuth(db *db.Storage, login string, password string) (bool, error) {
-	const op = "storage.postgres.entities.userAuth" // Имя текущей функции для логов и ошибок
-	qrResult, err := db.DB.Query(qrUserAuth, login)
+// TO DO: Переписать под ORM
+func (u *User) ValidateUser(storage *postgres.Storage, username, password string) error {
+	const op = "storage.postgres.entities.user.ValidateUser"
+
+	var correctPassword string
+	qrResult, err := storage.DB.Query(qrGetPassByUsername, username)
 	if err != nil {
-		return false, fmt.Errorf("%s: %w", op, err)
+		return fmt.Errorf("%s: %w", op, err)
 	}
-	for qrResult.Next() {
-		if err := qrResult.Scan(&u.UserID, &u.UserLogin, &u.Balance); err != nil {
-			return false, fmt.Errorf("%s: %w", op, err)
-		}
+
+	// Проверка на пустой ответ
+	if !qrResult.Next() {
+		return fmt.Errorf("%s: wrong username", op)
 	}
-	if password != globalPassword {
-		return false, fmt.Errorf("%s: %w", op, errHandler.ErrPassword)
+
+	if err := qrResult.Scan(&correctPassword); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
 	}
-	return true, nil
+
+	if password != correctPassword {
+		return fmt.Errorf("%s: wrong password", op)
+	}
+
+	return nil
+}
+
+// TO DO: Переписать под ORM
+func (u *User) GetUserID(storage *postgres.Storage, username string) (int, error) {
+	const op = "storage.postgres.entities.user.GetUserID"
+
+	var userID int
+	qrResult, err := storage.DB.Query(qrGetUserIDByUsername, username)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", op, err)
+	}
+
+	// Проверка на пустой ответ
+	if !qrResult.Next() {
+		return 0, fmt.Errorf("%s: wrong username", op)
+	}
+
+	if err := qrResult.Scan(&userID); err != nil {
+		return 0, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return userID, nil
+}
+
+type RefreshToken struct {
+	UserID         int
+	RefreshTokenID string
+}
+
+func (r *RefreshToken) ValidateRefreshTokenID(storage *postgres.Storage, username, refreshTokenID string) error {
+	const op = "storage.postgres.entities.user.ValidateRefreshTokenID"
+
+	var userID int
+	qrResult, err := storage.DB.Query(qrGetUserIDByUsername, username)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	if !qrResult.Next() {
+		return fmt.Errorf("%s: wrong username", op)
+	}
+	if err := qrResult.Scan(&userID); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	var correctRefreshTokenID string
+	qrResult, err = storage.DB.Query(qrGetRefreshTokenIDByUserID, userID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	if !qrResult.Next() {
+		return fmt.Errorf("%s: wrong userID", op)
+	}
+	if err := qrResult.Scan(&correctRefreshTokenID); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	if refreshTokenID != correctRefreshTokenID {
+		return fmt.Errorf("%s: wrong refresh token ID", op)
+	}
+
+	return nil
+}
+
+func (r *RefreshToken) StoreRefreshTokenID(storage *postgres.Storage, username, refreshTokenID string) error {
+	const op = "storage.postgres.entities.user.StoreRefreshTokenID"
+
+	var userID int
+	qrResult, err := storage.DB.Query(qrGetUserIDByUsername, username)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	if !qrResult.Next() {
+		return fmt.Errorf("%s: wrong username", op)
+	}
+	if err := qrResult.Scan(&userID); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	_, err = storage.DB.Exec(qrStoreRefreshTokenID, userID, refreshTokenID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }

@@ -2,8 +2,9 @@
 log_lvl: "info" # Минимальный отображаемый уровень логов - info, debug, warning или error
 sql_storage:  # Данные для работы с sql-хранилещем данных
   sql_driver: "postgres"
-  sql_info: "host=::1 port=5432 user=postgres password=Init123# dbname=portal_KD sslmode=disable"
+  sql_info: "host=::1 port=5432 user=postgres password=1111 dbname=portal_KD sslmode=disable"
 http_server: # конфигурация нашего http-сервера
   address: "localhost:8000"
   timeout: 4s
   idle_timeout: 30s
+token_ttl: "5s" # время жизни access token

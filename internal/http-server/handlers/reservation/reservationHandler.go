@@ -1,9 +1,9 @@
-package getReservationList
+package reservationHandler
 
 import (
 	"net/http"
 	"portal/internal/storage/postgres"
-	reservation "portal/internal/storage/postgres/entities/reservation"
+	"portal/internal/storage/postgres/entities/reservation"
 
 	"log/slog"
 

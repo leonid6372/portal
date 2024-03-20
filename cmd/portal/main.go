@@ -2,18 +2,18 @@ package main
 
 import (
 	"context"
-	"github.com/go-chi/jwtauth/v5"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"portal/internal/config"
+
 	addCartItem "portal/internal/http-server/handlers/add_cart_item"
-	"portal/internal/http-server/handlers/get_reservation_list"
+	getReservationList "portal/internal/http-server/handlers/get_reservation_list"
 	getShopList "portal/internal/http-server/handlers/get_shop_list"
-	logIn "portal/internal/http-server/handlers/log_in"
-	"portal/internal/http-server/handlers/reservation"
-	"portal/internal/lib/jwt"
+	reservationHandler "portal/internal/http-server/handlers/reservation"
+
+	"portal/internal/lib/auth"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
 	"syscall"
@@ -30,10 +30,6 @@ const (
 	logLVLError = "error"
 )
 
-var (
-	tokenAuth *jwtauth.JWTAuth
-)
-
 func main() {
 	cfg := config.MustLoad()
 
@@ -45,6 +41,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	err = auth.InitBearerServer(log, storage, cfg.TokenTTL)
+	if err != nil {
+		log.Error("failed to init bearer server", sl.Err(err))
+		os.Exit(1)
+	}
+
 	router := chi.NewRouter()
 
 	router.Use(middleware.RequestID) // Добавляет request_id в каждый запрос, для трейсинга
@@ -52,41 +54,7 @@ func main() {
 	router.Use(middleware.Recoverer) // Если где-то внутри сервера (обработчика запроса) произойдет паника, приложение не должно упасть
 	router.Use(middleware.URLFormat) // Парсер URLов поступающих запросов
 
-	// Инициализация шаблона для построения токенов по секрету и типу шифрования
-	tokenAuth, _ = jwt.Init()
-
-	// Protected routes
-	router.Group(func(router chi.Router) {
-		// Seek, verify and validate JWT tokens
-		router.Use(jwtauth.Verifier(tokenAuth))
-
-		// Handle valid / invalid tokens. In this example, we use
-		// the provided authenticator middleware, but you can write your
-		// own very easily, look at the Authenticator method in jwtauth.go
-		// and tweak it, its not scary.
-		router.Use(jwtauth.Authenticator(tokenAuth))
-
-		/* EXAMPLE: router.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
-			_, claims, _ := jwtauth.FromContext(r.Context())
-			w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
-		})*/
-
-	})
-
-	// Public routes
-	router.Group(func(r chi.Router) {
-		/* EXAMPLE: router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("welcome anonymous"))
-		})*/
-		router.Get("/api/log_in", logIn.New(log, storage, tokenAuth))
-		router.Post("/api/add_cart_item", addCartItem.New(log, storage))
-		router.Get("/api/get_shop_list", getShopList.New(log, storage))
-		router.Post("/api/reservation", reservation.New(log, storage))
-		router.Get("/api/get_reservation_list", getReservationList.New(log, storage))
-	})
-
-	/*router.Get("/api/get_shop_list", getShopList.New(log, storage))
-	router.Post("/api/add_cart_item", addCartItem.New(log, storage))*/
+	routeAPI(router, log, storage)
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 
@@ -142,4 +110,21 @@ func setupLogger(logLVL string) *slog.Logger {
 	}
 
 	return log
+}
+
+func routeAPI(router *chi.Mux, log *slog.Logger, storage *postgres.Storage) {
+	//Secured API group
+	router.Group(func(r chi.Router) {
+		// use the Bearer Authentication middleware
+		r.Use(auth.GetAuthHandler(log))
+		r.Post("/add_cart_item", addCartItem.New(log, storage))
+		r.Get("/get_shop_list", getShopList.New(log, storage))
+		r.Post("/api/reservation", reservationHandler.New(log, storage))
+		r.Get("/api/get_reservation_list", getReservationList.New(log, storage))
+	})
+
+	// Public API group
+	router.Group(func(r chi.Router) {
+		r.Post("/login", auth.GetBearerServer().UserCredentials)
+	})
 }

@@ -1,3 +1,4 @@
 1. приведение к JSON эффективнее на сервере или в postgres?
 2. ssl postgres
 3. ДДДДДДУ-ДОС
+4. reflect.Indirect(reflect.ValueOf(resp)).FieldByName("RefreshToken").String() - так можно получить значение поля структуры inreface{} по его имени в нужном формате (здесь string)
