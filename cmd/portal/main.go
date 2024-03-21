@@ -117,14 +117,15 @@ func routeAPI(router *chi.Mux, log *slog.Logger, storage *postgres.Storage) {
 	router.Group(func(r chi.Router) {
 		// use the Bearer Authentication middleware
 		r.Use(auth.GetAuthHandler(log))
-		r.Post("/add_cart_item", addCartItem.New(log, storage))
+		r.Post("/add_cart_item", addCartItem.New(log, storage)) // TO DO: переделать под новые поля таблицы in_cart_item
 		r.Get("/get_shop_list", getShopList.New(log, storage))
-		r.Post("/api/reservation", reservationHandler.New(log, storage))
-		r.Get("/api/get_reservation_list", getReservationList.New(log, storage))
+		r.Post("/reservation", reservationHandler.New(log, storage))
+		r.Get("/get_reservation_list", getReservationList.New(log, storage))
 	})
 
 	// Public API group
 	router.Group(func(r chi.Router) {
-		r.Post("/login", auth.GetBearerServer().UserCredentials)
+		r.Post("/login", auth.GetBearerServer().UserCredentialsPassword)
+		r.Post("/refresh", auth.GetBearerServer().UserCredentialsRefresh)
 	})
 }
