@@ -47,7 +47,7 @@ func GetAuthHandler(log *slog.Logger) func(next http.Handler) http.Handler {
 	secret, err := filepath.Abs("../portal/internal/lib/auth/secret.txt") // Относительный путь
 	if err != nil {
 		log.Error("failed to read secret key", sl.Err(err))
-	}*
+	}
 
 	return oauth.Authorize(string(secret), nil)
 }
