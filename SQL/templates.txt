@@ -14,8 +14,7 @@ CREATE TABLE item(
 	description varchar(500),
 	price INT,
 	photo_path varchar(150),
-	is_available BOOL NOT NULL,
-	is_service BOOL NOT NULL
+	is_available BOOL NOT NULL
 );
 
 CREATE TABLE in_cart_item(
