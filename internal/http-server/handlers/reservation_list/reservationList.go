@@ -1,6 +1,7 @@
-package getReservationList
+package reservationList
 
 import (
+	"encoding/json"
 	"net/http"
 	"portal/internal/storage/postgres"
 	reservation "portal/internal/storage/postgres/entities/reservation"
@@ -15,12 +16,12 @@ import (
 
 type Response struct {
 	resp.Response
-	ReservationList string `json:"reservation_list"`
+	ReservationList []reservation.Place `json:"reservationList"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.getReservationList.New"
+		const op = "handlers.reservationList.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -28,7 +29,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		)
 
 		var p *reservation.Place
-		placeList, err := p.GetActualPlaceList(storage)
+		rawPlaceList, err := p.GetActualPlaceList(storage)
 		if err != nil {
 			log.Error("failed to get reservation list")
 
@@ -40,13 +41,18 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 		log.Info("actual reservation list gotten")
 
+		var placeList []reservation.Place
+		_ = json.Unmarshal([]byte(rawPlaceList), &placeList)
+
 		responseOK(w, r, placeList)
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, reservationList string) {
-	render.JSON(w, r, Response{
+func responseOK(w http.ResponseWriter, r *http.Request, reservationList []reservation.Place) {
+	resp, _ := json.Marshal(Response{
 		Response:        resp.OK(),
 		ReservationList: reservationList,
 	})
+
+	render.Data(w, r, resp)
 }

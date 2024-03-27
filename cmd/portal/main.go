@@ -11,12 +11,19 @@ import (
 	"portal/internal/http-server/handlers/order"
 
 	addCartItem "portal/internal/http-server/handlers/add_cart_item"
+
 	dropCartItem "portal/internal/http-server/handlers/drop_cart_item"
-	getCartData "portal/internal/http-server/handlers/get_cart_data"
-	getReservationList "portal/internal/http-server/handlers/get_reservation_list"
-	getShopList "portal/internal/http-server/handlers/get_shop_list"
+	cartData "portal/internal/http-server/handlers/get_cart_data"
 	reservationHandler "portal/internal/http-server/handlers/reservation"
 	updateCartItem "portal/internal/http-server/handlers/update_cart_item"
+	profile "portal/internal/http-server/handlers/profile"
+	reservationHandler "portal/internal/http-server/handlers/reservation"
+	reservationDrop "portal/internal/http-server/handlers/reservation_drop"
+	reservationList "portal/internal/http-server/handlers/reservation_list"
+	reservationUpdate "portal/internal/http-server/handlers/reservation_update"
+	shopList "portal/internal/http-server/handlers/shop_list"
+	userReservations "portal/internal/http-server/handlers/user_reservations"
+
 
 	"portal/internal/lib/auth"
 	"portal/internal/lib/logger/sl"
@@ -122,18 +129,25 @@ func routeAPI(router *chi.Mux, log *slog.Logger, storage *postgres.Storage) {
 	router.Group(func(r chi.Router) {
 		// use the Bearer Authentication middleware
 		r.Use(auth.GetAuthHandler(log))
-		r.Get("/get_shop_list", getShopList.New(log, storage))
-		r.Post("/reservation", reservationHandler.New(log, storage))
-		r.Get("/get_reservation_list", getReservationList.New(log, storage))
+		r.Post("/api/reservation", reservationHandler.New(log, storage))
+		r.Get("/api/reservation_list", reservationList.New(log, storage))
+		r.Get("/api/user_reservations", userReservations.New(log, storage))
+		r.Post("/api/reservation_update", reservationUpdate.New(log, storage))
+		r.Post("/api/reservation_drop", reservationDrop.New(log, storage))
+    
+		r.Get("/api/profile", profile.New(log, storage))
+    
+    r.Get("/api/shop_list", shopList.New(log, storage))
+    r.Post("/api/add_cart_item", addCartItem.New(log, storage)) // TO DO: переделать под новые поля таблицы in_cart_item
+		r.Get("/api/cart_data", getCartData.New(log, storage))
+		r.Post("/api/drop_cart_item", dropCartItem.New(log, storage))
+		r.Post("/api/update_cart_item", updateCartItem.New(log, storage))
+		r.Post("/api/order", order.New(log, storage))
 	})
 
 	// Public API group
 	router.Group(func(r chi.Router) {
-		r.Post("/api/add_cart_item", addCartItem.New(log, storage))
-		r.Get("/api/get_cart_data", getCartData.New(log, storage))
-		r.Post("/api/login", auth.GetBearerServer().UserCredentials)
-		r.Post("/api/drop_cart_item", dropCartItem.New(log, storage))
-		r.Post("/api/update_cart_item", updateCartItem.New(log, storage))
-		r.Post("/api/order", order.New(log, storage))
+		r.Post("/api/login", auth.GetBearerServer().UserCredentialsPassword)
+		r.Post("/api/refresh", auth.GetBearerServer().UserCredentialsRefresh)
 	})
 }

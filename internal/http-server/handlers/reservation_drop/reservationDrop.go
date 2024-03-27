@@ -1,25 +1,22 @@
-package addCartItem
+package reservationDrop
 
 import (
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
-	storageHandler "portal/internal/storage"
 	"portal/internal/storage/postgres"
-	"portal/internal/storage/postgres/entities/shop"
+	"portal/internal/storage/postgres/entities/reservation"
 
-	"log/slog"
-
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 )
 
 type Request struct {
-	ItemID   int `json:"itemId,omitempty" validate:"required"`
-	Quantity int `json:"quantity,omitempty" validate:"required"`
+	ReservationID int `json:"reservationId,omitempty" validate:"required"`
 }
 
 type Response struct {
@@ -28,7 +25,7 @@ type Response struct {
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.addCartItem.New"
+		const op = "handlers.reservationDrop.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -72,30 +69,20 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
-		var c *shop.InCartItem
-		err = c.AddCartItem(storage, req.ItemID, req.Quantity)
-
-		// Обработка недоступности указанного item_id для заказа
-		if errors.As(err, &storageHandler.ErrItemUnavailable) {
-			log.Error(err.Error())
-
-			w.WriteHeader(406)
-			render.JSON(w, r, resp.Error("item is not available"))
-
-			return
-		}
+		var reservation *reservation.Reservation
+		err = reservation.ReservationDrop(storage, req.ReservationID)
 
 		// Обработка общего случая ошибки БД
 		if err != nil {
 			log.Error(err.Error())
 
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to add item in cart"))
+			render.JSON(w, r, resp.Error("failed to drop reservation"))
 
 			return
 		}
 
-		log.Info("item successfully added")
+		log.Info("reservation successfully dropped")
 
 		render.JSON(w, r, resp.OK())
 	}

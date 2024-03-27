@@ -18,12 +18,12 @@ const (
 )
 
 type Item struct {
-	ItemID      int
-	Name        string
-	Description string
-	Price       int
-	PhotoPath   string
-	IsAvailable bool
+	ItemID      int    `json:"itemId"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Price       int    `json:"price"`
+	PhotoPath   string `json:"photoPath"`
+	IsAvailable bool   `json:"isAvailable"`
 }
 
 func (i *Item) GetShopList(storage *postgres.Storage) (string, error) {
@@ -45,16 +45,16 @@ func (i *Item) GetShopList(storage *postgres.Storage) (string, error) {
 }
 
 type InCartItem struct {
-	InCartItemID int
-	ItemID       int
-	Quantity     int
+	InCartItemID int `json:"inCartItemId"`
+	ItemID       int `json:"itemId"`
+	Quantity     int `json:"quantity"`
 }
 
-func (ici *InCartItem) AddCartItem(storage *postgres.Storage, itemID, quantity int) error {
-	const op = "storage.postgres.entities.shop.Add"
+func (c *InCartItem) AddCartItem(storage *postgres.Storage, itemID, quantity int) error {
+	const op = "storage.postgres.entities.shop.AddCartItem"
 
 	var c *Cart
-	CartID, err := c.CreateCart(storage, 1)
+	CartID, err := c.CreateCart(storage, 1) // сделать чтобы юзер id вытаскивался
 
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
