@@ -8,7 +8,7 @@ import (
 const (
 	qrGetPassByUsername         = `SELECT "password" FROM "user" WHERE username = $1`
 	qrGetUserIDByUsername       = `SELECT user_id FROM "user" WHERE username = $1`
-	qrGetUserById               = `SELECT username, balance FROM "user" WHERE user_id = $1`
+	qrGetUserById               = `SELECT username, balance, "1c" FROM "user" WHERE user_id = $1`
 	qrGetRefreshTokenIDByUserID = `SELECT refresh_token_id FROM refresh_token WHERE user_id = $1`
 	qrStoreRefreshTokenID       = `INSERT INTO refresh_token (user_id, refresh_token_id)
 								   VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE
@@ -16,9 +16,12 @@ const (
 )
 
 type User struct {
-	UserID   int
-	Username string
-	Balance  int
+	UserID    int    `json:"userId"`
+	Data1C    string `json:"data1c"`
+	Username  string `json:"username"`
+	Balance   int    `json:"balance"`
+	Password  string `json:"password"`
+	AccessLVL int    `json:"accessLvl"`
 }
 
 func (u *User) GetUserById(storage *postgres.Storage) error {
@@ -34,7 +37,7 @@ func (u *User) GetUserById(storage *postgres.Storage) error {
 		return fmt.Errorf("%s: wrong user_id", op)
 	}
 
-	if err := qrResult.Scan(&u.Username, &u.Balance); err != nil {
+	if err := qrResult.Scan(&u.Username, &u.Balance, &u.Data1C); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
@@ -90,8 +93,8 @@ func (u *User) GetUserID(storage *postgres.Storage, username string) (int, error
 }
 
 type RefreshToken struct {
-	UserID         int
-	RefreshTokenID string
+	UserID         int    `json:"userId"`
+	RefreshTokenID string `json:"refreshTokenId"`
 }
 
 func (r *RefreshToken) ValidateRefreshTokenID(storage *postgres.Storage, username, refreshTokenID string) error {
