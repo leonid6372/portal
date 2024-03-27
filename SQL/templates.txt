@@ -84,7 +84,9 @@ CREATE VIEW actual_places AS
 	(p.place_id = r.place_id AND
 	(r.start > localtimestamp OR r.finish < localtimestamp))
 	OR (p.place_id != r.place_id)
+
 	EXCEPT
+
 	SELECT p.place_id, p.name, p.properties, true AS is_avalible FROM place AS p
 	JOIN reservation as r ON
 	p.place_id = r.place_id AND
