@@ -1,33 +1,33 @@
 CREATE TABLE "user"(
 	user_id SERIAL PRIMARY KEY,
-	"1c" JSONB,
-	balance INT
+	"1c" JSONB, balance INT,
+	access_lvl INT,
+	password varchar(50),
+	username varchar(50)
 );
 
-INSERT INTO "user"("1c", balance)
-VALUES ('{"username":"aa001", "test":"test"}'::jsonb, 100000),
-       ('{"username":"aa002", "test":"test"}'::jsonb, 0)
+INSERT INTO "user"("1c", balance, access_lvl, password, username)
+VALUES ('{"username":"aa001", "test":"test"}'::jsonb, 100000, 0, '1111', 'aa001'),
+       ('{"username":"aa002", "test":"test"}'::jsonb, 0, 5, '1111', 'aa002');
 
 CREATE TABLE item(
 	item_id SERIAL PRIMARY KEY,
 	"name" varchar(150) NOT NULL,
 	description varchar(500),
-	price INT,
-	photo_path varchar(150),
+	price INT, photo_path varchar(150),
 	is_available BOOL NOT NULL
 );
 
 CREATE TABLE in_cart_item(
 	in_cart_item_id SERIAL PRIMARY KEY,
-	item_id INT UNIQUE REFERENCES item(item_id) ON DELETE CASCADE,
-	quantity INT NOT NULL
-);
+	cart_id INT REFERENCES cart(cart_id) ON DELETE CASCADE,
+	item_id INT REFERENCES item(item_id) ON DELETE CASCADE,
+	quantity INT NOT NULL);
 
 CREATE TABLE cart(
 	cart_id SERIAL PRIMARY KEY,
-	in_cart_item_id INT REFERENCES in_cart_item(in_cart_item_id) ON DELETE CASCADE,
 	user_id INT REFERENCES "user"(user_id) ON DELETE CASCADE,
-	is_active BOOL,
+	is_active BOOL, 
 	"date" DATE
 );
 

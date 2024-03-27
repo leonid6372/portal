@@ -1,6 +1,7 @@
-package getShopList
+package shopList
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"log/slog"
@@ -15,12 +16,12 @@ import (
 
 type Response struct {
 	resp.Response
-	ShopList string `json:"shop_list"`
+	ShopList []shop.Item `json:"shopList"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.getShopList.New"
+		const op = "handlers.shopList.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -28,7 +29,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		)
 
 		var i *shop.Item
-		shopList, err := i.GetShopList(storage)
+		rawShopList, err := i.GetShopList(storage)
 		if err != nil {
 			log.Error("failed to get shop list")
 
@@ -40,13 +41,33 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 		log.Info("shop list gotten")
 
-		responseOK(w, r, shopList)
+		var shopList []shop.Item
+		if err = json.Unmarshal([]byte(rawShopList), &shopList); err != nil {
+			log.Error("failed to process response")
+
+			w.WriteHeader(500)
+			render.JSON(w, r, resp.Error("failed to process response"))
+
+			return
+		}
+
+		responseOK(w, r, log, shopList)
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, shopList string) {
-	render.JSON(w, r, Response{
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, shopList []shop.Item) {
+	response, err := json.Marshal(Response{
 		Response: resp.OK(),
 		ShopList: shopList,
 	})
+	if err != nil {
+		log.Error("failed to process response")
+
+		w.WriteHeader(500)
+		render.JSON(w, r, resp.Error("failed to process response"))
+
+		return
+	}
+
+	render.Data(w, r, response)
 }

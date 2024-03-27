@@ -3,16 +3,14 @@ package auth
 import (
 	"errors"
 	"net/http"
-	"path/filepath"
 	"portal/internal/lib/logger/sl"
+	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/user"
 	"strconv"
 	"time"
 
 	"log/slog"
-
-	"github.com/go-chi/oauth"
 )
 
 var bearerServer *oauth.BearerServer
@@ -25,11 +23,7 @@ func InitBearerServer(log *slog.Logger, storage *postgres.Storage, tokenTTL time
 	const op = "auth.NewBearerServer"
 	log.With(slog.String("op", op))
 
-	secret, err := filepath.Abs("../portal/internal/lib/auth/secret.txt") // Относительный путь
-	if err != nil {
-		log.Error("failed to read secret key", sl.Err(err))
-		return err
-	}
+	secret := "C:/Users/Leonid/Desktop/portal/internal/lib/auth/secret.txt"
 
 	bearerServer = oauth.NewBearerServer(
 		string(secret),
@@ -44,10 +38,7 @@ func GetAuthHandler(log *slog.Logger) func(next http.Handler) http.Handler {
 	const op = "auth.GetAuthHandler"
 	log.With(slog.String("op", op))
 
-	secret, err := filepath.Abs("../portal/internal/lib/auth/secret.txt") // Относительный путь
-	if err != nil {
-		log.Error("failed to read secret key", sl.Err(err))
-	}
+	secret := "C:/Users/Leonid/Desktop/portal/internal/lib/auth/secret.txt"
 
 	return oauth.Authorize(string(secret), nil)
 }

@@ -11,13 +11,12 @@ const (
 )
 
 type Item struct {
-	ItemID      int
-	Name        string
-	Description string
-	Price       int
-	PhotoPath   string
-	IsAvailable bool
-	IsService   bool
+	ItemID      int    `json:"itemId"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Price       int    `json:"price"`
+	PhotoPath   string `json:"photoPath"`
+	IsAvailable bool   `json:"isAvailable"`
 }
 
 // Переписать под ORM
@@ -40,13 +39,13 @@ func (i *Item) GetShopList(storage *postgres.Storage) (string, error) {
 }
 
 type InCartItem struct {
-	InCartItemID int
-	ItemID       int
-	Quantity     int
+	InCartItemID int `json:"inCartItemId"`
+	ItemID       int `json:"itemId"`
+	Quantity     int `json:"quantity"`
 }
 
 func (c *InCartItem) AddCartItem(storage *postgres.Storage, itemID, quantity int) error {
-	const op = "storage.postgres.entities.shop.Add"
+	const op = "storage.postgres.entities.shop.AddCartItem"
 
 	_, err := storage.DB.Exec(qrAddCartItem, itemID, quantity)
 	if err != nil {
