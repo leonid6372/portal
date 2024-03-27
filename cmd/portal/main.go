@@ -8,10 +8,15 @@ import (
 	"os/signal"
 	"portal/internal/config"
 
+	"portal/internal/http-server/handlers/order"
+
 	addCartItem "portal/internal/http-server/handlers/add_cart_item"
+	dropCartItem "portal/internal/http-server/handlers/drop_cart_item"
+	getCartData "portal/internal/http-server/handlers/get_cart_data"
 	getReservationList "portal/internal/http-server/handlers/get_reservation_list"
 	getShopList "portal/internal/http-server/handlers/get_shop_list"
 	reservationHandler "portal/internal/http-server/handlers/reservation"
+	updateCartItem "portal/internal/http-server/handlers/update_cart_item"
 
 	"portal/internal/lib/auth"
 	"portal/internal/lib/logger/sl"
@@ -117,14 +122,18 @@ func routeAPI(router *chi.Mux, log *slog.Logger, storage *postgres.Storage) {
 	router.Group(func(r chi.Router) {
 		// use the Bearer Authentication middleware
 		r.Use(auth.GetAuthHandler(log))
-		r.Post("/add_cart_item", addCartItem.New(log, storage))
 		r.Get("/get_shop_list", getShopList.New(log, storage))
-		r.Post("/api/reservation", reservationHandler.New(log, storage))
-		r.Get("/api/get_reservation_list", getReservationList.New(log, storage))
+		r.Post("/reservation", reservationHandler.New(log, storage))
+		r.Get("/get_reservation_list", getReservationList.New(log, storage))
 	})
 
 	// Public API group
 	router.Group(func(r chi.Router) {
-		r.Post("/login", auth.GetBearerServer().UserCredentials)
+		r.Post("/api/add_cart_item", addCartItem.New(log, storage))
+		r.Get("/api/get_cart_data", getCartData.New(log, storage))
+		r.Post("/api/login", auth.GetBearerServer().UserCredentials)
+		r.Post("/api/drop_cart_item", dropCartItem.New(log, storage))
+		r.Post("/api/update_cart_item", updateCartItem.New(log, storage))
+		r.Post("/api/order", order.New(log, storage))
 	})
 }
