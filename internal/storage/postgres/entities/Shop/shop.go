@@ -1,20 +1,21 @@
 package shop
 
 import (
+	"database/sql"
 	"fmt"
 	"portal/internal/storage/postgres"
 	"time"
 )
 
 const (
-	qrGetShopList       = `SELECT jsonb_agg(item) FROM item`
-	qrAddCartItem       = `INSERT INTO in_cart_item (item_id, quantity, cart_id) VALUES ($1, $2, $3)`
-	qrGetCartData       = `SELECT jsonb_agg(json_object('in_cart_item_id': in_cart_item_id, 'item_id': item_id, 'quantity': quantity)) FROM UserAvailableCart where is_active = true and user_id = ($1)`
-	qrCheckExistingCart = `SELECT cart_id FROM cart WHERE user_id = ($1) AND is_active = true`
-	qrCreateCart        = `INSERT INTO cart(user_id, is_active) VALUES ($1, true)`
-	qrDropCartItem      = `DELETE FROM in_cart_item WHERE in_cart_item_id = ($1)`
-	qrUpdateCartItem    = `UPDATE in_cart_item SET quantity = ($1) WHERE in_cart_item_id = ($2)`
-	qrOrder             = `UPDATE cart SET is_active = false and "date" = localtimestamp WHERE user_id = ($1) and is_active = true`
+	qrGetShopList    = `SELECT jsonb_agg(item) FROM item`
+	qrAddCartItem    = `INSERT INTO in_cart_item (item_id, quantity, cart_id) VALUES ($1, $2, $3)`
+	qrGetCartData    = `SELECT jsonb_agg(json_object('in_cart_item_id': in_cart_item_id, 'item_id': item_id, 'quantity': quantity)) FROM UserAvailableCart where is_active = true and user_id = ($1)`
+	qrGetActualCart  = `SELECT cart_id FROM cart WHERE user_id = ($1) AND is_active = true`
+	qrCreateCart     = `INSERT INTO cart(user_id, is_active) VALUES ($1, true)`
+	qrDropCartItem   = `DELETE FROM in_cart_item WHERE in_cart_item_id = ($1)`
+	qrUpdateCartItem = `UPDATE in_cart_item SET quantity = ($1) WHERE in_cart_item_id = ($2)`
+	qrOrder          = `UPDATE cart SET is_active = false and "date" = localtimestamp WHERE user_id = ($1) and is_active = true`
 )
 
 type Item struct {
@@ -50,7 +51,7 @@ type InCartItem struct {
 	Quantity     int `json:"quantity"`
 }
 
-func (c *InCartItem) AddCartItem(storage *postgres.Storage, itemID, quantity int) error {
+func (ici *InCartItem) AddCartItem(storage *postgres.Storage, itemID, quantity int) error {
 	const op = "storage.postgres.entities.shop.AddCartItem"
 
 	var c *Cart
@@ -98,24 +99,29 @@ type Cart struct {
 func (c *Cart) CreateCart(storage *postgres.Storage, userID int) (int, error) {
 	const op = "storage.postgres.entities.shop.CreateCart"
 
-	qrResult, err := storage.DB.Query(qrCheckExistingCart, userID)
-	if err != nil {
-		return 0, fmt.Errorf("%s: %w", op, err)
-	}
+	qrResult, err := c.GetActualCart(storage, userID)
 	if !qrResult.Next() {
 		_, err = storage.DB.Exec(qrCreateCart, userID)
 		if err != nil {
 			return 0, fmt.Errorf("%s: %w", op, err)
 		}
 	}
-
+	qrResult, err = c.GetActualCart(storage, userID)
 	var CartID int
-
 	if err = qrResult.Scan(&CartID); err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return CartID, nil
+}
+
+func (c *Cart) GetActualCart(storage *postgres.Storage, userID int) (*sql.Rows, error) {
+	const op = "storage.postgres.entities.shop.GetActualCart"
+	qrResult, err := storage.DB.Query(qrGetActualCart, userID)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return qrResult, nil
 }
 
 func (c *Cart) GetCartData(storage *postgres.Storage, userID int) ([]byte, error) {
