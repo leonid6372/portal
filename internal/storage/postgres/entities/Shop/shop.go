@@ -19,12 +19,12 @@ const (
 )
 
 type Item struct {
-	ItemID      int    `json:"itemId"`
+	ItemID      int    `json:"item_id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Price       int    `json:"price"`
-	PhotoPath   string `json:"photoPath"`
-	IsAvailable bool   `json:"isAvailable"`
+	PhotoPath   string `json:"photo_path"`
+	IsAvailable bool   `json:"is_available"`
 }
 
 func (i *Item) GetShopList(storage *postgres.Storage) (string, error) {
@@ -46,8 +46,8 @@ func (i *Item) GetShopList(storage *postgres.Storage) (string, error) {
 }
 
 type InCartItem struct {
-	InCartItemID int `json:"inCartItemId"`
-	ItemID       int `json:"itemId"`
+	InCartItemID int `json:"in_cart_item_id"`
+	ItemID       int `json:"item_id"`
 	Quantity     int `json:"quantity"`
 }
 
@@ -106,6 +106,7 @@ func (c *Cart) CreateCart(storage *postgres.Storage, userID int) (int, error) {
 			return 0, fmt.Errorf("%s: %w", op, err)
 		}
 		qrResult, err = c.GetActualCart(storage, userID)
+		qrResult.Next()
 	}
 
 	var CartID int
