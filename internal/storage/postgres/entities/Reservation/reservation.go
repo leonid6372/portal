@@ -17,7 +17,7 @@ const (
 )
 
 type Place struct {
-	PlaceID    int    `json:"placeID"`
+	PlaceID    int    `json:"place_id"`
 	Name       string `json:"name"`
 	Properties string `json:"properties"`
 }
@@ -58,11 +58,11 @@ func (p *Place) GetActualPlaceList(storage *postgres.Storage) (string, error) {
 }
 
 type Reservation struct {
-	ReservationID int              `json:"reservationId"`
-	PlaceID       int              `json:"placeId"`
+	ReservationID int              `json:"reservation_id"`
+	PlaceID       int              `json:"place_id"`
 	Start         pgtype.Timestamp `json:"start"`
 	Finish        pgtype.Timestamp `json:"finish"`
-	UserID        int              `json:"userId"`
+	UserID        int              `json:"user_id"`
 }
 
 func (r *Reservation) ReservationInsert(storage *postgres.Storage, placeID int, start, finish string) error {

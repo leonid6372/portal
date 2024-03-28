@@ -18,7 +18,7 @@ import (
 )
 
 type Request struct {
-	ItemID   int `json:"itemId,omitempty" validate:"required"`
+	ItemID   int `json:"item_id,omitempty" validate:"required"`
 	Quantity int `json:"quantity,omitempty" validate:"required"`
 }
 
