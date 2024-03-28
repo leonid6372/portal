@@ -105,8 +105,9 @@ func (c *Cart) CreateCart(storage *postgres.Storage, userID int) (int, error) {
 		if err != nil {
 			return 0, fmt.Errorf("%s: %w", op, err)
 		}
+		qrResult, err = c.GetActualCart(storage, userID)
 	}
-	qrResult, err = c.GetActualCart(storage, userID)
+
 	var CartID int
 	if err = qrResult.Scan(&CartID); err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
