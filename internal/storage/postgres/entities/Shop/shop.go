@@ -8,14 +8,19 @@ import (
 )
 
 const (
-	qrGetShopList    = `SELECT jsonb_agg(item) FROM item`
-	qrAddCartItem    = `INSERT INTO in_cart_item (item_id, quantity, cart_id) VALUES ($1, $2, $3)`
-	qrGetCartData    = `SELECT jsonb_agg(json_object('in_cart_item_id': in_cart_item_id, 'item_id': item_id, 'quantity': quantity)) FROM UserAvailableCart where is_active = true and user_id = ($1)`
-	qrGetActualCart  = `SELECT cart_id FROM cart WHERE user_id = ($1) AND is_active = true`
-	qrCreateCart     = `INSERT INTO cart(user_id, is_active) VALUES ($1, true)`
-	qrDropCartItem   = `DELETE FROM in_cart_item WHERE in_cart_item_id = ($1)`
-	qrUpdateCartItem = `UPDATE in_cart_item SET quantity = ($1) WHERE in_cart_item_id = ($2)`
-	qrOrder          = `UPDATE cart SET is_active = false and "date" = localtimestamp WHERE user_id = ($1) and is_active = true`
+	qrGetShopList       = `SELECT jsonb_agg(item) FROM item`
+	qrGetCartIDByUserID = `SELECT cart_id FROM cart WHERE user_id = $1`
+	qrGetCartData       = `SELECT jsonb_agg(json_object('in_cart_item_id': in_cart_item_id, 'item_id': item_id, 'quantity': quantity)) FROM UserAvailableCart where is_active = true and user_id = ($1)`
+	qrGetActualCart     = `SELECT cart_id FROM cart WHERE user_id = ($1) AND is_active = true`
+	qrCreateCart        = `INSERT INTO cart(user_id, is_active) VALUES ($1, true)`
+	qrAddCartItem       = `INSERT INTO in_cart_item (item_id, quantity, cart_id) VALUES ($1, $2, $3)`
+	qrDropCartItem      = `DELETE FROM in_cart_item WHERE in_cart_item_id = ($1)`
+	qrUpdateCartItem    = `UPDATE in_cart_item SET quantity = ($1) WHERE in_cart_item_id = ($2)`
+	qrOrder             = `UPDATE cart SET is_active = false and "date" = localtimestamp WHERE user_id = ($1) and is_active = true`
+	qrGetIsAvailable    = `SELECT is_available FROM item WHERE item_id = $1`
+	qrNewInCartItem     = `INSERT INTO in_cart_item(item_id, quantity, cart_id)
+						   VALUES($1, $2, $3) ON CONFLICT (item_id, cart_id) DO
+					   	   UPDATE SET quantity = in_cart_item.quantity + $2;`
 )
 
 type Item struct {
@@ -45,6 +50,25 @@ func (i *Item) GetShopList(storage *postgres.Storage) (string, error) {
 	return shopList, nil
 }
 
+func (i *Item) GetIsAvailable(storage *postgres.Storage, itemID int) error {
+	const op = "storage.postgres.entities.shop.GetIsAvailable"
+
+	qrResult, err := storage.DB.Query(qrGetIsAvailable, itemID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	if !qrResult.Next() {
+		return fmt.Errorf("%s: %w", op, "item is not exist")
+	}
+
+	if err := qrResult.Scan(&i.IsAvailable); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
 type InCartItem struct {
 	InCartItemID int `json:"in_cart_item_id"`
 	ItemID       int `json:"item_id"`
@@ -62,6 +86,17 @@ func (ici *InCartItem) AddCartItem(storage *postgres.Storage, itemID, quantity i
 	}
 
 	_, err = storage.DB.Exec(qrAddCartItem, itemID, quantity, CartID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (ici *InCartItem) NewInCartItem(storage *postgres.Storage, itemID, quantity, cartID int) error {
+	const op = "storage.postgres.entities.shop.AddCartItem"
+
+	_, err := storage.DB.Exec(qrNewInCartItem, itemID, quantity, cartID)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -173,4 +208,19 @@ func (c *Cart) GetUserOrderList(storage *postgres.Storage, userID int) (string, 
 	}
 
 	return shopList, nil
+}
+
+func (c *Cart) GetCartId(storage *postgres.Storage, userID int) error {
+	const op = "storage.postgres.entities.shop.GetCartID"
+
+	qrResult, err := storage.DB.Query(qrGetCartIDByUserID, userID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	qrResult.Next()
+	if err := qrResult.Scan(&c.CartID); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }
