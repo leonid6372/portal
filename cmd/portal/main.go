@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"portal/internal/config"
 	addCartItem "portal/internal/http-server/handlers/add_cart_item"
+	dropCart "portal/internal/http-server/handlers/drop_cart"
 	dropCartItem "portal/internal/http-server/handlers/drop_cart_item"
 	cartData "portal/internal/http-server/handlers/get_cart_data"
 	"portal/internal/http-server/handlers/order"
@@ -133,11 +134,13 @@ func routeAPI(router *chi.Mux, log *slog.Logger, storage *postgres.Storage) {
 		r.Get("/api/profile", profile.New(log, storage))
 
 		r.Get("/api/shop_list", shopList.New(log, storage))
-		r.Post("/api/add_cart_item", addCartItem.New(log, storage)) // TO DO: переделать под новые поля таблицы in_cart_item
 		r.Post("/api/order", order.New(log, storage))
-		r.Get("/api/cart_data", cartData.New(log, storage))
+
 		r.Post("/api/drop_cart_item", dropCartItem.New(log, storage))
 		r.Post("/api/update_cart_item", updateCartItem.New(log, storage))
+		r.Post("/api/drop_cart", dropCart.New(log, storage))
+		r.Get("/api/cart_data", cartData.New(log, storage))
+		r.Post("/api/add_cart_item", addCartItem.New(log, storage))
 
 	})
 
@@ -145,6 +148,5 @@ func routeAPI(router *chi.Mux, log *slog.Logger, storage *postgres.Storage) {
 	router.Group(func(r chi.Router) {
 		r.Post("/api/login", auth.GetBearerServer().UserCredentialsPassword)
 		r.Post("/api/refresh", auth.GetBearerServer().UserCredentialsRefresh)
-
 	})
 }

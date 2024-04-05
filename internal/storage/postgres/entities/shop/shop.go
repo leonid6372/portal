@@ -21,6 +21,7 @@ const (
 	qrNewInCartItem     = `INSERT INTO in_cart_item(item_id, quantity, cart_id)
 						   VALUES($1, $2, $3) ON CONFLICT (item_id, cart_id) DO
 					   	   UPDATE SET quantity = in_cart_item.quantity + $2;`
+	qrDropCart = `delete from in_cart_item as ici where exists(select 1 from cart where cart.cart_id = ici.cart_id AND cart.is_active = true AND cart.user_id = ($1))`
 )
 
 type Item struct {
@@ -150,6 +151,16 @@ func (c *Cart) CreateCart(storage *postgres.Storage, userID int) (int, error) {
 	}
 
 	return CartID, nil
+}
+
+func (c *Cart) DropCart(storage *postgres.Storage, userID int) error {
+	const op = "storage.postgres.entities.shop.UpdateCartItem"
+
+	_, err := storage.DB.Exec(qrDropCart, userID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	return nil
 }
 
 func (c *Cart) GetActualCart(storage *postgres.Storage, userID int) (*sql.Rows, error) {
