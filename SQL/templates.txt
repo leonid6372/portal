@@ -100,3 +100,22 @@ CREATE VIEW actual_places AS
 	(r.start <= localtimestamp OR r.finish >= localtimestamp)
 
 	order by place_id;
+
+create view UserAvailableCart as (SELECT c.cart_id,
+                   c.user_id,
+                   ici.in_cart_item_id,
+                   ici.item_id,
+                   ici.quantity,
+                   c.is_active
+                  FROM cart c
+                    JOIN in_cart_item ici ON c.cart_id = ici.cart_id
+                 ORDER BY c.cart_id;
+               create view UserAvailableCart as ( SELECT c.cart_id,
+                   c.user_id,
+                   ici.in_cart_item_id,
+                   ici.item_id,
+                   ici.quantity,
+                   c.is_active
+                  FROM cart c
+                    JOIN in_cart_item ici ON c.cart_id = ici.cart_id
+                 ORDER BY c.cart_id;))
