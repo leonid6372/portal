@@ -133,7 +133,7 @@ func routeAPI(router *chi.Mux, log *slog.Logger, storage *postgres.Storage) {
 		r.Get("/api/profile", profile.New(log, storage))
 
 		r.Get("/api/shop_list", shopList.New(log, storage))
-		r.Post("/api/add_cart_item", addCartItem.New(log, storage)) // TO DO: переделать под новые поля таблицы in_cart_item
+		r.Post("/api/add_cart_item", addCartItem.New(log, storage))
 		r.Post("/api/order", order.New(log, storage))
 		r.Get("/api/cart_data", cartData.New(log, storage))
 		r.Post("/api/drop_cart_item", dropCartItem.New(log, storage))

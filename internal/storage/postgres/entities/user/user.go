@@ -16,12 +16,12 @@ const (
 )
 
 type User struct {
-	UserID    int    `json:"userId"`
-	Data1C    string `json:"data1c"`
-	Username  string `json:"username"`
-	Balance   int    `json:"balance"`
-	Password  string `json:"password"`
-	AccessLVL int    `json:"accessLvl"`
+	UserID    int    `json:"user_id,omitempty"`
+	Data1C    string `json:"data_1c,omitempty"`
+	Username  string `json:"username,omitempty"`
+	Balance   int    `json:"balance,omitempty"`
+	Password  string `json:"password,omitempty"`
+	AccessLVL int    `json:"access_lvl,omitempty"`
 }
 
 func (u *User) GetUserById(storage *postgres.Storage) error {
@@ -93,8 +93,8 @@ func (u *User) GetUserID(storage *postgres.Storage, username string) (int, error
 }
 
 type RefreshToken struct {
-	UserID         int    `json:"userId"`
-	RefreshTokenID string `json:"refreshTokenId"`
+	UserID         int    `json:"user_id,omitempty"`
+	RefreshTokenID string `json:"refresh_token_id,omitempty"`
 }
 
 func (r *RefreshToken) ValidateRefreshTokenID(storage *postgres.Storage, username, refreshTokenID string) error {

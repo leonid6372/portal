@@ -2,27 +2,24 @@ package get_cart_data
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"log/slog"
 	"net/http"
+	storageHandler "portal/internal/storage"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/shop"
+	"strconv"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 
 	resp "portal/internal/lib/api/response"
+	"portal/internal/lib/oauth"
 )
 
 type Response struct {
 	resp.Response
-	CartData []CartData `json:"cart_data"`
-}
-
-type CartData struct {
-	ItemID       int `json:"item_id"`
-	Quantity     int `json:"quantity"`
-	InCartItemID int `json:"in_cart_item_id"`
+	InCartItems shop.InCartItems `json:"cart_data"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
@@ -34,32 +31,69 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		var c *shop.Cart
-		cartData, err := c.GetCartData(storage, 1)
+		// Получаем userID из токена авторизации
+		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]string)
+		userID, err := strconv.Atoi(tempUserID["user_id"])
 		if err != nil {
-			log.Error("failed to get cart data")
-			fmt.Printf("%s", err)
+			log.Error("failed to get user id from token claims")
+			w.WriteHeader(500)
+			render.JSON(w, r, resp.Error("failed to get user id from token claims"))
+			return
+		}
 
+		// Запрос cart_id для вызывающего user_id
+		var c shop.Cart
+		err = c.GetActiveCartID(storage, userID)
+		if err != nil {
+			// Если ошибка не об отсутствии корзины, то выход по стнадартной ошибке БД
+			if !errors.As(err, &storageHandler.ErrCartDoesNotExist) {
+				log.Error("failed to get active cart id", err)
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				return
+			}
+			// Если ошибка выше была об отсутствии корзины, то создаем корзину
+			if err := c.NewCart(storage, userID); err != nil {
+				log.Error("failed to create new cart", err)
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to create cart: "+err.Error()))
+				return
+			}
+			// Получаем номер созданной корзины
+			if err := c.GetActiveCartID(storage, userID); err != nil {
+				log.Error("failed to get active cart id", err)
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				return
+			}
+		}
+
+		// Заполняем слайс товарами для нужной корзины из БД
+		var inCartItems shop.InCartItems
+		if err := inCartItems.GetInCartItems(storage, c.CartID); err != nil {
+			log.Error("failed to get in cart items", err)
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get cart data"))
-
+			render.JSON(w, r, resp.Error("failed to get in cart items: "+err.Error()))
 			return
 		}
 
 		log.Info("cart data loaded")
 
-		var itemList []CartData
-		_ = json.Unmarshal(cartData, &itemList)
-
-		responseOK(w, r, itemList)
+		responseOK(w, r, log, inCartItems)
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, cartData []CartData) {
-	resp, _ := json.Marshal(Response{
-		Response: resp.OK(),
-		CartData: cartData,
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, inCartItems shop.InCartItems) {
+	response, err := json.Marshal(Response{
+		Response:    resp.OK(),
+		InCartItems: inCartItems,
 	})
+	if err != nil {
+		log.Error("failed to process response")
+		w.WriteHeader(500)
+		render.JSON(w, r, resp.Error("failed to process response"))
+		return
+	}
 
-	render.Data(w, r, resp)
+	render.Data(w, r, response)
 }

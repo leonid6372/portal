@@ -19,8 +19,8 @@ import (
 // Временная вспомогательная структура
 type Data1C struct {
 	Position  string `json:"position"`
-	FullName  string `json:"fullName"`
-	PhotoPath string `json:"photoPath"`
+	FullName  string `json:"full_name"`
+	PhotoPath string `json:"photo_path"`
 }
 
 // Временная вспомогательная структура

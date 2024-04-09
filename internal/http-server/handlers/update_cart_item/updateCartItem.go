@@ -42,18 +42,14 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			// Такую ошибку встретим, если получили запрос с пустым телом.
 			// Обработаем её отдельно
 			log.Error("request body is empty")
-
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("empty request"))
-
+			render.JSON(w, r, resp.Error("empty request: "+err.Error()))
 			return
 		}
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
-
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request"))
-
+			render.JSON(w, r, resp.Error("failed to decode request: "+err.Error()))
 			return
 		}
 
@@ -62,25 +58,19 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Валидация обязательных полей запроса
 		if err := validator.New().Struct(req); err != nil {
 			validateErr := err.(validator.ValidationErrors)
-
 			w.WriteHeader(400)
 			log.Error("invalid request", sl.Err(err))
-
 			render.JSON(w, r, resp.ValidationError(validateErr))
-
 			return
 		}
 
+		// Обновление предмета в корзине
 		var ici *shop.InCartItem
-		err = ici.UpdateCartItem(storage, req.InCartItemID, req.Quantity)
-
-		// Обработка общего случая ошибки БД
+		err = ici.UpdateInCartItem(storage, req.InCartItemID, req.Quantity)
 		if err != nil {
 			log.Error(err.Error())
-
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to update item"))
-
+			render.JSON(w, r, resp.Error("failed to update item: "+err.Error()))
 			return
 		}
 

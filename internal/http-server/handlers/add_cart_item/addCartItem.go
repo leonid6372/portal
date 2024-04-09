@@ -13,6 +13,8 @@ import (
 
 	"log/slog"
 
+	storageHandler "portal/internal/storage"
+
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
@@ -93,11 +95,29 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 		// Запрос cart_id для вызывающего user_id
 		var c shop.Cart
-		if err := c.GetCartId(storage, userID); err != nil {
-			log.Error("failed to get cart id", err)
-			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get cart id"+err.Error()))
-			return
+		err = c.GetActiveCartID(storage, userID)
+		if err != nil {
+			// Если ошибка не об отсутствии корзины, то выход по стнадартной ошибке БД
+			if !errors.As(err, &storageHandler.ErrCartDoesNotExist) {
+				log.Error("failed to get active cart id", err)
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				return
+			}
+			// Если ошибка выше была об отсутствии корзины, то создаем корзину
+			if err := c.NewCart(storage, userID); err != nil {
+				log.Error("failed to create new cart", err)
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to create cart: "+err.Error()))
+				return
+			}
+			// Получаем номер созданной корзины
+			if err := c.GetActiveCartID(storage, userID); err != nil {
+				log.Error("failed to get active cart id", err)
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				return
+			}
 		}
 
 		// Добавление item в корзину
@@ -105,7 +125,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err := ici.NewInCartItem(storage, req.ItemID, req.Quantity, c.CartID); err != nil {
 			log.Error("failed to add item in cart", err)
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to add item in cart"+err.Error()))
+			render.JSON(w, r, resp.Error("failed to add item in cart: "+err.Error()))
 			return
 		}
 
