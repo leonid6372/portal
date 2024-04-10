@@ -23,15 +23,9 @@ type Data1C struct {
 	PhotoPath string `json:"photo_path"`
 }
 
-// Временная вспомогательная структура
-type UserInfo struct {
-	Balance int    `json:"balance"`
-	Data    Data1C `json:"data"`
-}
-
 type Response struct {
 	resp.Response
-	Profile UserInfo `json:"profile"`
+	Profile Data1C `json:"profile"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
@@ -43,56 +37,50 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
+		// Получаем user id из токена
 		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]string)
 		userID, err := strconv.Atoi(tempUserID["user_id"])
 		if err != nil {
-			log.Error("failed to get user id from token claimss")
+			log.Error("failed to get user id from token claims")
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to get user id from token claims"))
+			render.JSON(w, r, resp.Error("failed to get user id from token claims: "+err.Error()))
 			return
 		}
 
-		var u user.User
-		u.UserID = userID
+		// Получаем данные пользователя по user id из БД
+		u := user.User{UserID: userID}
 		err = u.GetUserById(storage)
 		if err != nil {
-			log.Error("failed to get user info")
-
+			log.Error("failed to get profile")
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get user info"))
-
+			render.JSON(w, r, resp.Error("failed to get profile: "+err.Error()))
 			return
 		}
 
-		log.Info("shop list gotten")
+		log.Info("profile data successfully gotten")
 
+		// Декодируем полученный из БД JSON с данными профиля
 		var data1C Data1C
 		if err = json.Unmarshal([]byte(u.Data1C), &data1C); err != nil {
 			log.Error("failed to process response")
-
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to process response"))
-
+			render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 			return
 		}
 
-		userInfo := UserInfo{Balance: u.Balance, Data: data1C}
-
-		responseOK(w, r, log, userInfo)
+		responseOK(w, r, log, data1C)
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, userInfo UserInfo) {
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, profile Data1C) {
 	response, err := json.Marshal(Response{
 		Response: resp.OK(),
-		Profile:  userInfo,
+		Profile:  profile,
 	})
 	if err != nil {
 		log.Error("failed to process response")
-
 		w.WriteHeader(500)
-		render.JSON(w, r, resp.Error("failed to process response"))
-
+		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 		return
 	}
 

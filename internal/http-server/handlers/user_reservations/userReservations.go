@@ -16,7 +16,7 @@ import (
 
 type Response struct {
 	resp.Response
-	UserReservations []reservation.Reservation `json:"userReservations"`
+	Reservations reservation.Reservations `json:"user_reservations"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
@@ -28,53 +28,39 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
+		// Поулчаем user id из токена
 		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]string)
 		userID, err := strconv.Atoi(tempUserID["user_id"])
 		if err != nil {
-			log.Error("failed to get user id from token claimss")
+			log.Error("failed to get user id from token claims")
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to get user id from token claims"))
+			render.JSON(w, r, resp.Error("failed to get user id from token claims: "+err.Error()))
 			return
 		}
 
-		var rsrv *reservation.Reservation
-		rawUserReservations, err := rsrv.GetUserReservations(storage, userID)
-		if err != nil {
-			log.Error("failed to get user reservations")
-
+		var reservations reservation.Reservations
+		if err := reservations.GetReservationsByUserID(storage, userID); err != nil {
+			log.Error("failed to get reservation list")
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get user reservations"))
-
+			render.JSON(w, r, resp.Error("failed to get reservation list: "+err.Error()))
 			return
 		}
 
 		log.Info("user reservations gotten")
 
-		var userReservations []reservation.Reservation
-		if err = json.Unmarshal([]byte(rawUserReservations), &userReservations); err != nil {
-			log.Error("failed to process response")
-
-			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to process response"))
-
-			return
-		}
-
-		responseOK(w, r, log, userReservations)
+		responseOK(w, r, log, reservations)
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, userReservations []reservation.Reservation) {
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, reservations reservation.Reservations) {
 	response, err := json.Marshal(Response{
-		Response:         resp.OK(),
-		UserReservations: userReservations,
+		Response:     resp.OK(),
+		Reservations: reservations,
 	})
 	if err != nil {
 		log.Error("failed to process response")
-
 		w.WriteHeader(500)
-		render.JSON(w, r, resp.Error("failed to process response"))
-
+		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 		return
 	}
 

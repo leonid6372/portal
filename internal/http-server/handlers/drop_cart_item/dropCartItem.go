@@ -17,7 +17,7 @@ import (
 )
 
 type Request struct {
-	InCartItemID int `json:"in_cart_item_id,omitempty" validate:"required"`
+	InCartItemID int `json:"in_cart_item_id" validate:"required"`
 }
 
 type Response struct {
@@ -42,13 +42,13 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if errors.Is(err, io.EOF) {
 			log.Error("request body is empty")
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("empty request"))
+			render.JSON(w, r, resp.Error("empty request: "+err.Error()))
 			return
 		}
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request"))
+			render.JSON(w, r, resp.Error("failed to decode request: "+err.Error()))
 			return
 		}
 

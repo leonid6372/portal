@@ -51,7 +51,7 @@ func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, items 
 	if err != nil {
 		log.Error("failed to process response")
 		w.WriteHeader(500)
-		render.JSON(w, r, resp.Error("failed to process response"))
+		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 		return
 	}
 

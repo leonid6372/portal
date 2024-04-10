@@ -6,13 +6,13 @@ import (
 )
 
 const (
-	qrGetPassByUsername         = `SELECT "password" FROM "user" WHERE username = $1`
-	qrGetUserIDByUsername       = `SELECT user_id FROM "user" WHERE username = $1`
-	qrGetUserById               = `SELECT username, balance, "1c" FROM "user" WHERE user_id = $1`
-	qrGetRefreshTokenIDByUserID = `SELECT refresh_token_id FROM refresh_token WHERE user_id = $1`
+	qrGetPassByUsername         = `SELECT "password" FROM "user" WHERE username = $1;`
+	qrGetUserIDByUsername       = `SELECT user_id FROM "user" WHERE username = $1;`
+	qrGetUserById               = `SELECT "1c" FROM "user" WHERE user_id = $1;`
+	qrGetRefreshTokenIDByUserID = `SELECT refresh_token_id FROM refresh_token WHERE user_id = $1;`
 	qrStoreRefreshTokenID       = `INSERT INTO refresh_token (user_id, refresh_token_id)
 								   VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE
-								   SET refresh_token_id = EXCLUDED.refresh_token_id`
+								   SET refresh_token_id = EXCLUDED.refresh_token_id;`
 )
 
 type User struct {
@@ -37,7 +37,7 @@ func (u *User) GetUserById(storage *postgres.Storage) error {
 		return fmt.Errorf("%s: wrong user_id", op)
 	}
 
-	if err := qrResult.Scan(&u.Username, &u.Balance, &u.Data1C); err != nil {
+	if err := qrResult.Scan(&u.Data1C); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
@@ -48,7 +48,6 @@ func (u *User) GetUserById(storage *postgres.Storage) error {
 func (u *User) ValidateUser(storage *postgres.Storage, username, password string) error {
 	const op = "storage.postgres.entities.user.ValidateUser"
 
-	var correctPassword string
 	qrResult, err := storage.DB.Query(qrGetPassByUsername, username)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
@@ -59,6 +58,7 @@ func (u *User) ValidateUser(storage *postgres.Storage, username, password string
 		return fmt.Errorf("%s: wrong username", op)
 	}
 
+	var correctPassword string
 	if err := qrResult.Scan(&correctPassword); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -74,7 +74,6 @@ func (u *User) ValidateUser(storage *postgres.Storage, username, password string
 func (u *User) GetUserID(storage *postgres.Storage, username string) (int, error) {
 	const op = "storage.postgres.entities.user.GetUserID"
 
-	var userID int
 	qrResult, err := storage.DB.Query(qrGetUserIDByUsername, username)
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
@@ -85,6 +84,7 @@ func (u *User) GetUserID(storage *postgres.Storage, username string) (int, error
 		return 0, fmt.Errorf("%s: wrong username", op)
 	}
 
+	var userID int
 	if err := qrResult.Scan(&userID); err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
@@ -100,7 +100,6 @@ type RefreshToken struct {
 func (r *RefreshToken) ValidateRefreshTokenID(storage *postgres.Storage, username, refreshTokenID string) error {
 	const op = "storage.postgres.entities.user.ValidateRefreshTokenID"
 
-	var userID int
 	qrResult, err := storage.DB.Query(qrGetUserIDByUsername, username)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
@@ -108,11 +107,11 @@ func (r *RefreshToken) ValidateRefreshTokenID(storage *postgres.Storage, usernam
 	if !qrResult.Next() {
 		return fmt.Errorf("%s: wrong username", op)
 	}
+	var userID int
 	if err := qrResult.Scan(&userID); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	var correctRefreshTokenID string
 	qrResult, err = storage.DB.Query(qrGetRefreshTokenIDByUserID, userID)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
@@ -120,6 +119,7 @@ func (r *RefreshToken) ValidateRefreshTokenID(storage *postgres.Storage, usernam
 	if !qrResult.Next() {
 		return fmt.Errorf("%s: wrong userID", op)
 	}
+	var correctRefreshTokenID string
 	if err := qrResult.Scan(&correctRefreshTokenID); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -134,7 +134,6 @@ func (r *RefreshToken) ValidateRefreshTokenID(storage *postgres.Storage, usernam
 func (r *RefreshToken) StoreRefreshTokenID(storage *postgres.Storage, username, refreshTokenID string) error {
 	const op = "storage.postgres.entities.user.StoreRefreshTokenID"
 
-	var userID int
 	qrResult, err := storage.DB.Query(qrGetUserIDByUsername, username)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
@@ -142,6 +141,7 @@ func (r *RefreshToken) StoreRefreshTokenID(storage *postgres.Storage, username, 
 	if !qrResult.Next() {
 		return fmt.Errorf("%s: wrong username", op)
 	}
+	var userID int
 	if err := qrResult.Scan(&userID); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}

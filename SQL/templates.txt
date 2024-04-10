@@ -78,3 +78,8 @@ CREATE VIEW actual_places AS
 	(r.start <= localtimestamp OR r.finish >= localtimestamp)
 
 	order by place_id;
+
+CREATE VIEW place_and_reservation AS (
+	SELECT reservation.place_id, place.name, place.properties, reservation.start, reservation.finish
+ 	FROM reservation
+ 	JOIN place ON reservation.place_id = place.place_id);

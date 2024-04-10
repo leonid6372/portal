@@ -3,17 +3,24 @@ package reservation
 import (
 	"fmt"
 	"portal/internal/storage/postgres"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
-	qrGetPlaceById        = `SELECT name, properties FROM place WHERE place_id = $1`
-	qrReservationInsert   = `INSERT INTO reservation (place_id, start, finish, user_id) VALUES ($1, $2, $3, 1)` // сделать $4
-	qrGetActualPlaceList  = `SELECT jsonb_agg(actual_places) FROM actual_places;`
-	qrGetUserReservations = `SELECT reservation_id, place_id, start, finish FROM reservation WHERE user_id = $1`
-	qrReservationUpdate   = `UPDATE reservation SET place_id = $2, start = $3, finish = $4 WHERE reservation_id = $1`
-	qrDeleteReservation   = `DELETE FROM reservation WHERE reservation_id = $1`
+	// Получение актуальных мест 1. делаем все места "доступно" и вычитаем занятые 2. прибавляем занятые с пометкой "недостпуно"
+	qrGetActualPlaces = `(SELECT *, true AS is_available FROM place
+						  EXCEPT
+						  SELECT DISTINCT place_id, "name", properties, true AS is_available FROM place_and_reservation
+						  WHERE ($1, $2) OVERLAPS ("start", finish))
+						  UNION
+						  (SELECT DISTINCT place_id, "name", properties, false AS is_available FROM place_and_reservation
+						  WHERE ($1, $2) OVERLAPS ("start", finish));`
+	qrGetReservationsByUserID = `SELECT reservation_id, place_id, start, finish FROM reservation WHERE user_id = $1;`
+	qrInsertReservation       = `INSERT INTO reservation (place_id, start, finish, user_id) VALUES ($1, $3, $4, $2);`
+	qrUpdateReservation       = `UPDATE reservation SET place_id = $2, start = $3, finish = $4 WHERE reservation_id = $1;`
+	qrDeleteReservation       = `DELETE FROM reservation WHERE reservation_id = $1;`
 )
 
 type Place struct {
@@ -22,39 +29,30 @@ type Place struct {
 	Properties string `json:"properties,omitempty"`
 }
 
-func (p *Place) GetPlaceById(storage *postgres.Storage) (bool, error) {
-	const op = "storage.postgres.entities.reservation.getPlaceById" // Имя текущей функции для логов и ошибок
-
-	qrResult, err := storage.DB.Query(qrGetPlaceById, p.PlaceID)
-	if err != nil {
-		return false, fmt.Errorf("%s: %w", op, err)
-	}
-
-	for qrResult.Next() {
-		if err := qrResult.Scan(&p.Name, &p.Properties); err != nil {
-			return false, fmt.Errorf("%s: %w", op, err)
-		}
-	}
-
-	return true, nil
+type ActualPlace struct {
+	Place
+	IsAvailable bool `json:"is_available"`
 }
 
-func (p *Place) GetActualPlaceList(storage *postgres.Storage) (string, error) {
-	const op = "storage.postgres.entities.reservation.GetActualPlaceList" // Имя текущей функции для логов и ошибок
+type ActualPlaces []ActualPlace
 
-	qrResult, err := storage.DB.Query(qrGetActualPlaceList)
+func (aps *ActualPlaces) GetActualPlaces(storage *postgres.Storage, properties string, start, finish time.Time) error {
+	const op = "storage.postgres.entities.reservation.GetActualPlaces"
+
+	qrResult, err := storage.DB.Query(qrGetActualPlaces, start, finish)
 	if err != nil {
-		return "", fmt.Errorf("%s: %w", op, err)
+		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	var placeList string
 	for qrResult.Next() {
-		if err := qrResult.Scan(&placeList); err != nil {
-			return "", fmt.Errorf("%s: %w", op, err)
+		var ap ActualPlace
+		if err := qrResult.Scan(&ap.PlaceID, &ap.Name, &ap.Properties, &ap.IsAvailable); err != nil {
+			return fmt.Errorf("%s: %w", op, err)
 		}
+		*aps = append(*aps, ap)
 	}
 
-	return placeList, nil
+	return nil
 }
 
 type Reservation struct {
@@ -65,10 +63,10 @@ type Reservation struct {
 	UserID        int              `json:"user_id,omitempty"`
 }
 
-func (r *Reservation) ReservationInsert(storage *postgres.Storage, placeID int, start, finish string) error {
-	const op = "storage.postgres.entities.reservation.ReservationInsert" // Имя текущей функции для логов и ошибок
+func (r *Reservation) InsertReservation(storage *postgres.Storage, placeID, userID int, start, finish string) error {
+	const op = "storage.postgres.entities.reservation.InsertReservation" // Имя текущей функции для логов и ошибок
 
-	_, err := storage.DB.Exec(qrReservationInsert, placeID, start, finish) // добавить userID
+	_, err := storage.DB.Exec(qrInsertReservation, placeID, userID, start, finish)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -76,28 +74,10 @@ func (r *Reservation) ReservationInsert(storage *postgres.Storage, placeID int, 
 	return nil
 }
 
-func (r *Reservation) GetUserReservations(storage *postgres.Storage, userID int) (string, error) {
-	const op = "storage.postgres.entities.reservation.GetUserReservations" // Имя текущей функции для логов и ошибок
+func (r *Reservation) UpdateReservation(storage *postgres.Storage, reservationID, placeID int, start, finish time.Time) error {
+	const op = "storage.postgres.entities.reservation.UpdateReservation" // Имя текущей функции для логов и ошибок
 
-	qrResult, err := storage.DB.Query(qrGetUserReservations, userID)
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", op, err)
-	}
-
-	var userReservations string
-	for qrResult.Next() {
-		if err := qrResult.Scan(&userReservations); err != nil {
-			return "", fmt.Errorf("%s: %w", op, err)
-		}
-	}
-
-	return userReservations, nil
-}
-
-func (r *Reservation) ReservationUpdate(storage *postgres.Storage, reservationID, placeID int, start, finish pgtype.Timestamp) error {
-	const op = "storage.postgres.entities.reservation.ReservationUpdate" // Имя текущей функции для логов и ошибок
-
-	_, err := storage.DB.Exec(qrReservationUpdate, reservationID, placeID, start, finish)
+	_, err := storage.DB.Exec(qrUpdateReservation, reservationID, placeID, start, finish)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -106,12 +86,32 @@ func (r *Reservation) ReservationUpdate(storage *postgres.Storage, reservationID
 }
 
 func (r *Reservation) DeleteReservation(storage *postgres.Storage, reservationID int) error {
-	const op = "storage.postgres.entities.reservation.ReservationDrop" // Имя текущей функции для логов и ошибок
+	const op = "storage.postgres.entities.reservation.DeleteReservation" // Имя текущей функции для логов и ошибок
 
 	_, err := storage.DB.Exec(qrDeleteReservation, reservationID)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
+	return nil
+}
+
+type Reservations []Reservation
+
+func (rs *Reservations) GetReservationsByUserID(storage *postgres.Storage, userID int) error {
+	const op = "storage.postgres.entities.reservation.GetReservationsByUserID" // Имя текущей функции для логов и ошибок
+
+	qrResult, err := storage.DB.Query(qrGetReservationsByUserID, userID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	for qrResult.Next() {
+		r := Reservation{UserID: userID}
+		if err := qrResult.Scan(&r.ReservationID, &r.PlaceID, &r.Start, &r.Finish); err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+		*rs = append(*rs, r)
+	}
 	return nil
 }

@@ -35,7 +35,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to get user id from token claims")
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to get user id from token claims"))
+			render.JSON(w, r, resp.Error("failed to get user id from token claim: "+err.Error()))
 			return
 		}
 

@@ -16,7 +16,7 @@ import (
 )
 
 type Request struct {
-	ReservationID int `json:"reservation_id,omitempty" validate:"required"`
+	ReservationID int `json:"reservation_id" validate:"required"`
 }
 
 type Response struct {
@@ -62,14 +62,13 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
+		// Удаление записи брониварония из БД
 		var reservation *reservation.Reservation
 		err = reservation.DeleteReservation(storage, req.ReservationID)
-
-		// Обработка общего случая ошибки БД
 		if err != nil {
 			log.Error(err.Error())
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to drop reservation"))
+			render.JSON(w, r, resp.Error("failed to drop reservation: "+err.Error()))
 			return
 		}
 

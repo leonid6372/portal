@@ -37,7 +37,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to get user id from token claims")
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to get user id from token claims"))
+			render.JSON(w, r, resp.Error("failed to get user id from token claims: "+err.Error()))
 			return
 		}
 
@@ -69,8 +69,8 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		}
 
 		// Заполняем слайс товарами для нужной корзины из БД
-		var inCartItems shop.InCartItems
-		if err := inCartItems.GetInCartItems(storage, c.CartID); err != nil {
+		var icis shop.InCartItems
+		if err := icis.GetInCartItems(storage, c.CartID); err != nil {
 			log.Error("failed to get in cart items", err)
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get in cart items: "+err.Error()))
@@ -79,7 +79,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 		log.Info("cart data loaded")
 
-		responseOK(w, r, log, inCartItems)
+		responseOK(w, r, log, icis)
 	}
 }
 
@@ -91,7 +91,7 @@ func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, inCart
 	if err != nil {
 		log.Error("failed to process response")
 		w.WriteHeader(500)
-		render.JSON(w, r, resp.Error("failed to process response"))
+		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 		return
 	}
 

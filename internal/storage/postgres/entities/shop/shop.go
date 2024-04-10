@@ -79,7 +79,7 @@ type InCartItem struct {
 }
 
 func (ici *InCartItem) NewInCartItem(storage *postgres.Storage, itemID, quantity, cartID int) error {
-	const op = "storage.postgres.entities.shop.AddCartItem"
+	const op = "storage.postgres.entities.shop.NewInCartItem"
 
 	_, err := storage.DB.Exec(qrNewInCartItem, itemID, quantity, cartID)
 	if err != nil {
@@ -90,7 +90,7 @@ func (ici *InCartItem) NewInCartItem(storage *postgres.Storage, itemID, quantity
 }
 
 func (ici *InCartItem) DeleteInCartItem(storage *postgres.Storage, inCartItemID int) error {
-	const op = "storage.postgres.entities.shop.DropCartItem"
+	const op = "storage.postgres.entities.shop.DeleteInCartItem"
 
 	_, err := storage.DB.Exec(qrDeleteInCartItem, inCartItemID)
 	if err != nil {
@@ -100,7 +100,7 @@ func (ici *InCartItem) DeleteInCartItem(storage *postgres.Storage, inCartItemID 
 }
 
 func (ici *InCartItem) UpdateInCartItem(storage *postgres.Storage, inCartItemID, quantity int) error {
-	const op = "storage.postgres.entities.shop.UpdateCartItem"
+	const op = "storage.postgres.entities.shop.UpdateInCartItem"
 
 	_, err := storage.DB.Exec(qrUpdateInCartItem, quantity, inCartItemID)
 	if err != nil {
@@ -139,7 +139,7 @@ type Cart struct {
 }
 
 func (c *Cart) UpdateCartToInactive(storage *postgres.Storage, userID int) error {
-	const op = "storage.postgres.entities.shop.UpdateCartItem"
+	const op = "storage.postgres.entities.shop.UpdateCartToInactive"
 
 	_, err := storage.DB.Exec(qrUpdateCartToInactive, userID)
 	if err != nil {

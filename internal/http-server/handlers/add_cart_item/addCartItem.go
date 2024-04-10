@@ -21,8 +21,8 @@ import (
 )
 
 type Request struct {
-	ItemID   int `json:"item_id,omitempty" validate:"required"`
-	Quantity int `json:"quantity,omitempty" validate:"required"`
+	ItemID   int `json:"item_id" validate:"required"`
+	Quantity int `json:"quantity" validate:"required"`
 }
 
 type Response struct {
@@ -47,13 +47,13 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if errors.Is(err, io.EOF) {
 			log.Error("request body is empty")
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("empty request"))
+			render.JSON(w, r, resp.Error("empty request: "+err.Error()))
 			return
 		}
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request"))
+			render.JSON(w, r, resp.Error("failed to decode request: "+err.Error()))
 			return
 		}
 
@@ -74,7 +74,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to get user id from token claims")
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to get user id from token claims"))
+			render.JSON(w, r, resp.Error("failed to get user id from token claims: "+err.Error()))
 			return
 		}
 
@@ -89,7 +89,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if !i.IsAvailable {
 			log.Error("item is not available")
 			w.WriteHeader(406)
-			render.JSON(w, r, resp.Error("item is not available"))
+			render.JSON(w, r, resp.Error("item is not available: "+err.Error()))
 			return
 		}
 
