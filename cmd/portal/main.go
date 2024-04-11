@@ -103,7 +103,7 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 	//Secured API group
 	router.Group(func(r chi.Router) {
 		// use the Bearer Authentication middleware
-		r.Use(oauth.Authorize(secret, nil, bearerServer))
+		r.Use(oauth.Authorize(secret, nil, bearerServer, log))
 		r.Post("/api/reservation", reservationHandler.New(log, storage))
 		r.Get("/api/reservation_list", reservationList.New(log, storage))
 		r.Get("/api/user_reservations", userReservations.New(log, storage))

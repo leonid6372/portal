@@ -45,7 +45,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if errors.Is(err, io.EOF) {
 			log.Error("request body is empty")
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("empty request: "+err.Error()))
+			render.JSON(w, r, resp.Error("empty request"))
 			return
 		}
 		if err != nil {
@@ -70,7 +70,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		var reservation *reservation.Reservation
 		err = reservation.UpdateReservation(storage, req.ReservationID, req.PlaceID, req.Start, req.Finish)
 		if err != nil {
-			log.Error(err.Error())
+			log.Error("failed to update reservation", sl.Err(err))
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to update reservation: "+err.Error()))
 			return

@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/render"
 
 	resp "portal/internal/lib/api/response"
+	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
 )
 
@@ -46,21 +47,21 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			// Если ошибка не об отсутствии корзины, то выход по стнадартной ошибке БД
 			if !errors.As(err, &storageHandler.ErrCartDoesNotExist) {
-				log.Error("failed to get active cart id", err)
+				log.Error("failed to get active cart id", sl.Err(err))
 				w.WriteHeader(422)
 				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
 				return
 			}
 			// Если ошибка выше была об отсутствии корзины, то создаем корзину
 			if err := c.NewCart(storage, userID); err != nil {
-				log.Error("failed to create new cart", err)
+				log.Error("failed to create new cart", sl.Err(err))
 				w.WriteHeader(422)
 				render.JSON(w, r, resp.Error("failed to create cart: "+err.Error()))
 				return
 			}
 			// Получаем номер созданной корзины
 			if err := c.GetActiveCartID(storage, userID); err != nil {
-				log.Error("failed to get active cart id", err)
+				log.Error("failed to get active cart id", sl.Err(err))
 				w.WriteHeader(422)
 				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
 				return
@@ -71,7 +72,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		var ici *shop.InCartItem
 		icis, err := ici.GetInCartItems(storage, c.CartID)
 		if err != nil {
-			log.Error("failed to get in cart items", err)
+			log.Error("failed to get in cart items", sl.Err(err))
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get in cart items: "+err.Error()))
 			return
@@ -89,7 +90,7 @@ func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, inCart
 		InCartItems: inCartItems,
 	})
 	if err != nil {
-		log.Error("failed to process response")
+		log.Error("failed to process response", sl.Err(err))
 		w.WriteHeader(500)
 		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 		return

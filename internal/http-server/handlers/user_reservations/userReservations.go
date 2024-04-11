@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	resp "portal/internal/lib/api/response"
+	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/reservation"
 
@@ -39,7 +40,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 		var reservations reservation.Reservations
 		if err := reservations.GetReservationsByUserID(storage, userID); err != nil {
-			log.Error("failed to get reservation list")
+			log.Error("failed to get reservation list", sl.Err(err))
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get reservation list: "+err.Error()))
 			return
@@ -57,7 +58,7 @@ func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, reserv
 		Reservations: reservations,
 	})
 	if err != nil {
-		log.Error("failed to process response")
+		log.Error("failed to process response", sl.Err(err))
 		w.WriteHeader(500)
 		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 		return

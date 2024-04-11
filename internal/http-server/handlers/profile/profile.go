@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/render"
 
 	resp "portal/internal/lib/api/response"
+	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/user"
@@ -50,7 +51,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		u := user.User{UserID: userID}
 		err := u.GetUserById(storage)
 		if err != nil {
-			log.Error("failed to get profile")
+			log.Error("failed to get profile", sl.Err(err))
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get profile: "+err.Error()))
 			return
@@ -61,7 +62,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Декодируем полученный из БД JSON с данными профиля
 		var data1C Data1C
 		if err = json.Unmarshal([]byte(u.Data1C), &data1C); err != nil {
-			log.Error("failed to process response")
+			log.Error("failed to process response", sl.Err(err))
 			w.WriteHeader(500)
 			render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 			return
@@ -77,7 +78,7 @@ func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, profil
 		Profile:  profile,
 	})
 	if err != nil {
-		log.Error("failed to process response")
+		log.Error("failed to process response", sl.Err(err))
 		w.WriteHeader(500)
 		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 		return

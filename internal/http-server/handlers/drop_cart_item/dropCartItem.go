@@ -42,7 +42,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if errors.Is(err, io.EOF) {
 			log.Error("request body is empty")
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("empty request: "+err.Error()))
+			render.JSON(w, r, resp.Error("empty request"))
 			return
 		}
 		if err != nil {
@@ -66,7 +66,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Удаление item из корзины
 		var ici *shop.InCartItem
 		if err := ici.DeleteInCartItem(storage, req.InCartItemID); err != nil {
-			log.Error("failed to delete in cart item", err)
+			log.Error("failed to delete in cart item", sl.Err(err))
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to delete in cart item: "+err.Error()))
 			return

@@ -110,43 +110,43 @@ func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential st
 	switch grantType {
 	case PasswordGrant:
 		if err := bs.verifier.ValidateUser(credential, secret, scope, r); err != nil {
-			return "Not authorized", http.StatusUnauthorized
+			return "Not authorized: " + err.Error(), http.StatusUnauthorized
 		}
 
 		token, refresh, err := bs.generateTokens(credential, scope, r)
 		if err != nil {
-			return "Token generation failed, check claims", http.StatusInternalServerError
+			return "Token generation failed, check claims: " + err.Error(), http.StatusInternalServerError
 		}
 
 		if err = bs.verifier.StoreTokenID(credential, token.ID, refresh.RefreshTokenID); err != nil {
-			return "Storing Token ID failed", http.StatusInternalServerError
+			return "Storing Token ID failed: " + err.Error(), http.StatusInternalServerError
 		}
 
 		if response, err = bs.cryptTokens(token, refresh, r); err != nil {
-			return "Token generation failed, check security provider", http.StatusInternalServerError
+			return "Token generation failed, check security provider: " + err.Error(), http.StatusInternalServerError
 		}
 	case RefreshTokenGrant:
 		refresh, err := bs.provider.DecryptRefreshTokens(refreshToken)
 		if err != nil {
-			return "Not authorized", http.StatusUnauthorized
+			return "Not authorized: " + err.Error(), http.StatusUnauthorized
 		}
 
 		if err = bs.verifier.ValidateTokenID(refresh.Credential, refresh.TokenID, refresh.RefreshTokenID); err != nil {
-			return "Not authorized invalid token", http.StatusUnauthorized
+			return "Not authorized invalid token: " + err.Error(), http.StatusUnauthorized
 		}
 
 		token, refresh, err := bs.generateTokens(refresh.Credential, refresh.Scope, r)
 		if err != nil {
-			return "Token generation failed", http.StatusInternalServerError
+			return "Token generation failed: " + err.Error(), http.StatusInternalServerError
 		}
 
 		err = bs.verifier.StoreTokenID(refresh.Credential, token.ID, refresh.RefreshTokenID)
 		if err != nil {
-			return "Storing Token ID failed", http.StatusInternalServerError
+			return "Storing Token ID failed: " + err.Error(), http.StatusInternalServerError
 		}
 
 		if response, err = bs.cryptTokens(token, refresh, r); err != nil {
-			return "Token generation failed", http.StatusInternalServerError
+			return "Token generation failed: " + err.Error(), http.StatusInternalServerError
 		}
 	default:
 		return "Invalid grant_type", http.StatusBadRequest

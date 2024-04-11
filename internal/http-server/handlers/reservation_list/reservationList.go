@@ -47,7 +47,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if errors.Is(err, io.EOF) {
 			log.Error("request body is empty")
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("empty request: "+err.Error()))
+			render.JSON(w, r, resp.Error("empty request"))
 			return
 		}
 		if err != nil {
@@ -70,7 +70,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// TO DO: проработать поиск по параметрам рабочего места
 		aps, err := ap.GetActualPlaces(storage, req.Properties, req.Start, req.Finish)
 		if err != nil {
-			log.Error("failed to get reservation list")
+			log.Error("failed to get reservation list", sl.Err(err))
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get reservation list: "+err.Error()))
 			return
@@ -88,7 +88,7 @@ func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, actual
 		ActualPlaces: actualPlaces,
 	})
 	if err != nil {
-		log.Error("failed to process response")
+		log.Error("failed to process response", sl.Err(err))
 		w.WriteHeader(500)
 		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 		return

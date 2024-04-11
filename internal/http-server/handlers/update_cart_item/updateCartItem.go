@@ -43,7 +43,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			// Обработаем её отдельно
 			log.Error("request body is empty")
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("empty request: "+err.Error()))
+			render.JSON(w, r, resp.Error("empty request"))
 			return
 		}
 		if err != nil {
@@ -68,7 +68,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		var ici *shop.InCartItem
 		err = ici.UpdateInCartItem(storage, req.InCartItemID, req.Quantity)
 		if err != nil {
-			log.Error(err.Error())
+			log.Error("failed to update item", sl.Err(err))
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to update item: "+err.Error()))
 			return

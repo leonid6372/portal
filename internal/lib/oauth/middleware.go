@@ -3,11 +3,15 @@ package oauth
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
-	resp "portal/internal/lib/api/response"
 	"reflect"
 	"time"
 
+	resp "portal/internal/lib/api/response"
+	"portal/internal/lib/logger/sl"
+
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 )
 
@@ -25,11 +29,12 @@ type BearerAuthentication struct {
 	secretKey    string
 	provider     *TokenProvider
 	BearerServer *BearerServer
+	Log          *slog.Logger
 }
 
 // NewBearerAuthentication create a BearerAuthentication middleware
-func NewBearerAuthentication(secretKey string, formatter TokenSecureFormatter, bs *BearerServer) *BearerAuthentication {
-	ba := &BearerAuthentication{secretKey: secretKey, BearerServer: bs}
+func NewBearerAuthentication(secretKey string, formatter TokenSecureFormatter, bs *BearerServer, log *slog.Logger) *BearerAuthentication {
+	ba := &BearerAuthentication{secretKey: secretKey, BearerServer: bs, Log: log}
 	if formatter == nil {
 		formatter = NewSHA256RC4TokenSecurityProvider([]byte(secretKey))
 	}
@@ -39,8 +44,8 @@ func NewBearerAuthentication(secretKey string, formatter TokenSecureFormatter, b
 
 // Authorize is the OAuth 2.0 middleware for go-chi resource server.
 // Authorize creates a BearerAuthentication middleware and return the Authorize method.
-func Authorize(secretKey string, formatter TokenSecureFormatter, bs *BearerServer) func(next http.Handler) http.Handler {
-	return NewBearerAuthentication(secretKey, formatter, bs).Authorize
+func Authorize(secretKey string, formatter TokenSecureFormatter, bs *BearerServer, log *slog.Logger) func(next http.Handler) http.Handler {
+	return NewBearerAuthentication(secretKey, formatter, bs, log).Authorize
 }
 
 // Authorize verifies the bearer token authorizing or not the request.
@@ -48,22 +53,34 @@ func Authorize(secretKey string, formatter TokenSecureFormatter, bs *BearerServe
 // Authorization: Bearer {access_token}
 func (ba *BearerAuthentication) Authorize(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		const op = "lib.oauth.Authorize"
+
+		log := ba.Log.With(
+			slog.String("op", op),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
+		)
+
 		cookie, err := r.Cookie("access_token")
 		if err != nil {
 			switch {
 			case errors.Is(err, http.ErrNoCookie):
-				http.Error(w, "cookie not found", http.StatusBadRequest)
+				log.Error("cookie not found")
+				w.WriteHeader(http.StatusBadRequest)
+				render.JSON(w, r, resp.Error("cookie not found"))
 			default:
-				http.Error(w, "server error", http.StatusInternalServerError)
+				log.Error("server error", sl.Err(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				render.JSON(w, r, resp.Error("server error: "+err.Error()))
 			}
 			return
 		}
-		auth := string([]byte(cookie.Value))
+		auth := cookie.Value
 
 		token, err := ba.checkAuthorization(auth, w, r)
 		if err != nil {
+			log.Error("Not authorized", sl.Err(err))
 			w.WriteHeader(http.StatusUnauthorized)
-			render.JSON(w, r, "Not authorized: "+err.Error())
+			render.JSON(w, r, resp.Error("Not authorized: "+err.Error()))
 			return
 		}
 
@@ -72,6 +89,9 @@ func (ba *BearerAuthentication) Authorize(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, ClaimsContext, token.Claims)
 		ctx = context.WithValue(ctx, ScopeContext, token.Scope)
 		ctx = context.WithValue(ctx, AccessTokenContext, auth)
+
+		log.Info("authorization success")
+
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -80,27 +100,15 @@ func (ba *BearerAuthentication) Authorize(next http.Handler) http.Handler {
 func (ba *BearerAuthentication) checkAuthorization(auth string, w http.ResponseWriter, r *http.Request) (t *Token, err error) {
 	token, err := ba.provider.DecryptToken(auth)
 	if err != nil {
-		return nil, errors.New("Invalid token")
+		return nil, errors.New("Invalid token: " + err.Error())
 	}
 	if time.Now().UTC().After(token.CreationDate.Add(token.ExpiresIn)) {
 		scope := r.FormValue("scope")
-		cookie, cookieErr := r.Cookie("refresh_token")
-		if cookieErr != nil {
-			switch {
-			case errors.Is(err, http.ErrNoCookie):
-				http.Error(w, "cookie not found", http.StatusBadRequest)
-			default:
-				http.Error(w, "server error", http.StatusInternalServerError)
-			}
-			return nil, errors.New("Not authorized")
-		}
-		refreshToken := string([]byte(cookie.Value))
+		refreshToken := auth
 		response, statusCode := ba.BearerServer.generateTokenResponse(GrantType("refresh_token"), "", "", refreshToken, scope, "", "", r)
 
 		if statusCode != 200 {
-			w.WriteHeader(statusCode)
-			render.JSON(w, r, resp.Error(response))
-			return
+			return nil, errors.New("Error while token generating: " + reflect.ValueOf(response).String())
 		}
 
 		http.SetCookie(w,

@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/render"
 
 	resp "portal/internal/lib/api/response"
+	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/shop"
 )
@@ -32,7 +33,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		var i shop.Item
 		is, err := i.GetItems(storage)
 		if err != nil {
-			log.Error("failed to get shop list", err)
+			log.Error("failed to get shop list", sl.Err(err))
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get shop list: "+err.Error()))
 			return
@@ -50,7 +51,7 @@ func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, items 
 		Items:    items,
 	})
 	if err != nil {
-		log.Error("failed to process response")
+		log.Error("failed to process response", sl.Err(err))
 		w.WriteHeader(500)
 		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 		return

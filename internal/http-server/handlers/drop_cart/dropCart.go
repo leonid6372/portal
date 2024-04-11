@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	resp "portal/internal/lib/api/response"
+	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
 	storageHandler "portal/internal/storage"
 	"portal/internal/storage/postgres"
@@ -44,21 +45,21 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			// Если ошибка не об отсутствии корзины, то выход по стнадартной ошибке БД
 			if !errors.As(err, &storageHandler.ErrCartDoesNotExist) {
-				log.Error("failed to get active cart id", err)
+				log.Error("failed to get active cart id", sl.Err(err))
 				w.WriteHeader(422)
 				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
 				return
 			}
 			// Если ошибка выше была об отсутствии корзины, то создаем корзину
 			if err := c.NewCart(storage, userID); err != nil {
-				log.Error("failed to create new cart", err)
+				log.Error("failed to create new cart", sl.Err(err))
 				w.WriteHeader(422)
 				render.JSON(w, r, resp.Error("failed to create cart: "+err.Error()))
 				return
 			}
 			// Получаем номер созданной корзины
 			if err := c.GetActiveCartID(storage, userID); err != nil {
-				log.Error("failed to get active cart id", err)
+				log.Error("failed to get active cart id", sl.Err(err))
 				w.WriteHeader(422)
 				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
 				return
@@ -68,7 +69,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Очистка текущей корзины
 		err = c.EmptyCart(storage, c.CartID)
 		if err != nil {
-			log.Error("failed to empty cart")
+			log.Error("failed to empty cart", sl.Err(err))
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to empty cart: "+err.Error()))
 			return
