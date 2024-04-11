@@ -10,10 +10,11 @@ import (
 
 type Config struct {
 	//Env      string `yaml:"env" env-default:"local"`
-	LogLVL     string `yaml:"log_lvl" env-default:"info"`
-	SQLStorage `yaml:"sql_storage"`
-	HTTPServer `yaml:"http_server"`
-	TokenTTL   time.Duration `yaml:"token_ttl" end-default:2h"`
+	LogLVL       string `yaml:"log_lvl" env-default:"info"`
+	SQLStorage   `yaml:"sql_storage"`
+	HTTPServer   `yaml:"http_server"`
+	BearerServer `yaml:"bearer_server"`
+	TokenTTL     time.Duration `yaml:"token_ttl" end-default:2h"`
 }
 
 type SQLStorage struct {
@@ -27,8 +28,13 @@ type HTTPServer struct {
 	IdleTimeout time.Duration `yaml:"idle_timeout" env-default:"60s"`
 }
 
+type BearerServer struct {
+	SecretPath string `yaml:"secret_path" env-required:"true"`
+	Secret     string
+	TokenTTL   time.Duration `yaml:"token_ttl" end-default:2h"`
+}
+
 func MustLoad() *Config {
-	//configPath := "C:/Users/Leonid/Desktop/portal/config/local.yaml"
 	configPath := "C:/Users/Leonid/Desktop/portal/config/local.yaml"
 	if configPath == "" {
 		log.Fatal("CONFIG_PATH is not set")
@@ -44,6 +50,18 @@ func MustLoad() *Config {
 	if err := cleanenv.ReadConfig(configPath, &cfg); err != nil {
 		log.Fatalf("cannot read config: %s", err)
 	}
+
+	// check if oauth secret file exists
+	if _, err := os.Stat(cfg.BearerServer.SecretPath); os.IsNotExist(err) {
+		log.Fatalf("oauth secret file does not exist: %s", cfg.BearerServer.SecretPath)
+	}
+
+	secret, err := os.ReadFile(cfg.BearerServer.SecretPath)
+	if err != nil {
+		log.Fatalf("failed to read secret key: %s", err)
+	}
+
+	cfg.BearerServer.Secret = string(secret)
 
 	return &cfg
 }

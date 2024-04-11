@@ -29,8 +29,9 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		)
 
 		// Получаем слайс товаров
-		var is shop.Items
-		if err := is.GetItems(storage); err != nil {
+		var i shop.Item
+		is, err := i.GetItems(storage)
+		if err != nil {
 			log.Error("failed to get shop list", err)
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get shop list: "+err.Error()))
@@ -43,7 +44,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, items shop.Items) {
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, items []shop.Item) {
 	response, err := json.Marshal(Response{
 		Response: resp.OK(),
 		Items:    items,

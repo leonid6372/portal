@@ -34,25 +34,25 @@ type ActualPlace struct {
 	IsAvailable bool `json:"is_available"`
 }
 
-type ActualPlaces []ActualPlace
-
-func (aps *ActualPlaces) GetActualPlaces(storage *postgres.Storage, properties string, start, finish time.Time) error {
+func (ap *ActualPlace) GetActualPlaces(storage *postgres.Storage, properties string, start, finish time.Time) ([]ActualPlace, error) {
 	const op = "storage.postgres.entities.reservation.GetActualPlaces"
 
 	qrResult, err := storage.DB.Query(qrGetActualPlaces, start, finish)
 	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+
+	var aps []ActualPlace
 
 	for qrResult.Next() {
 		var ap ActualPlace
 		if err := qrResult.Scan(&ap.PlaceID, &ap.Name, &ap.Properties, &ap.IsAvailable); err != nil {
-			return fmt.Errorf("%s: %w", op, err)
+			return nil, fmt.Errorf("%s: %w", op, err)
 		}
-		*aps = append(*aps, ap)
+		aps = append(aps, ap)
 	}
 
-	return nil
+	return aps, nil
 }
 
 type Reservation struct {
@@ -113,5 +113,6 @@ func (rs *Reservations) GetReservationsByUserID(storage *postgres.Storage, userI
 		}
 		*rs = append(*rs, r)
 	}
+
 	return nil
 }

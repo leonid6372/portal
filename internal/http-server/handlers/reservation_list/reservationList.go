@@ -26,7 +26,7 @@ type Request struct {
 
 type Response struct {
 	resp.Response
-	ActualPlaces reservation.ActualPlaces `json:"reservation_list"`
+	ActualPlaces []reservation.ActualPlace `json:"reservation_list"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
@@ -66,9 +66,10 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		}
 
 		// Запрашиваем свободные места согласно заданным параметарм бронирования
-		var aps reservation.ActualPlaces
+		var ap reservation.ActualPlace
 		// TO DO: проработать поиск по параметрам рабочего места
-		if err := aps.GetActualPlaces(storage, req.Properties, req.Start, req.Finish); err != nil {
+		aps, err := ap.GetActualPlaces(storage, req.Properties, req.Start, req.Finish)
+		if err != nil {
 			log.Error("failed to get reservation list")
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get reservation list: "+err.Error()))
@@ -81,7 +82,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, actualPlaces reservation.ActualPlaces) {
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, actualPlaces []reservation.ActualPlace) {
 	response, err := json.Marshal(Response{
 		Response:     resp.OK(),
 		ActualPlaces: actualPlaces,

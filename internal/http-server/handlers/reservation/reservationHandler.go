@@ -10,7 +10,6 @@ import (
 	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
 	reservation "portal/internal/storage/postgres/entities/reservation"
-	"strconv"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
@@ -67,12 +66,12 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		}
 
 		// Получаем userID из токена авторизации
-		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]string)
-		userID, err := strconv.Atoi(tempUserID["user_id"])
-		if err != nil {
-			log.Error("failed to get user id from token claims")
+		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]int)
+		userID, ok := tempUserID["user_id"]
+		if !ok {
+			log.Error("no user id in token claims")
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to get user id from token claims: "+err.Error()))
+			render.JSON(w, r, resp.Error("no user id in token claims"))
 			return
 		}
 

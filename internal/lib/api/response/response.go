@@ -8,8 +8,8 @@ import (
 )
 
 type Response struct {
-	Status string `json:"status"`
-	Error  string `json:"error,omitempty"`
+	Status string      `json:"status"`
+	Error  interface{} `json:"error,omitempty"`
 }
 
 const (
@@ -23,7 +23,7 @@ func OK() Response {
 	}
 }
 
-func Error(msg string) Response {
+func Error(msg interface{}) Response {
 	return Response{
 		Status: StatusError,
 		Error:  msg,

@@ -3,7 +3,6 @@ package profile
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"log/slog"
 
@@ -37,19 +36,19 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		// Получаем user id из токена
-		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]string)
-		userID, err := strconv.Atoi(tempUserID["user_id"])
-		if err != nil {
-			log.Error("failed to get user id from token claims")
+		// Получаем userID из токена авторизации
+		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]int)
+		userID, ok := tempUserID["user_id"]
+		if !ok {
+			log.Error("no user id in token claims")
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to get user id from token claims: "+err.Error()))
+			render.JSON(w, r, resp.Error("no user id in token claims"))
 			return
 		}
 
 		// Получаем данные пользователя по user id из БД
 		u := user.User{UserID: userID}
-		err = u.GetUserById(storage)
+		err := u.GetUserById(storage)
 		if err != nil {
 			log.Error("failed to get profile")
 			w.WriteHeader(422)

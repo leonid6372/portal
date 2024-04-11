@@ -9,17 +9,18 @@ import (
 )
 
 const (
-	qrNewCart              = `INSERT INTO cart(user_id, is_active) VALUES ($1, true);`
-	qrGetItems             = `SELECT * FROM item;`
-	qrGetInCartItems       = `SELECT in_cart_item_id, item_id, quantity FROM in_active_cart_item WHERE cart_id = $1;`
-	qrGetActiveCartID      = `SELECT cart_id FROM cart WHERE user_id = ($1) AND is_active = true;`
-	qrGetIsAvailable       = `SELECT is_available FROM item WHERE item_id = $1;`
-	qrDeleteInCartItem     = `DELETE FROM in_cart_item WHERE in_cart_item_id = ($1);`
-	qrUpdateInCartItem     = `UPDATE in_cart_item SET quantity = ($1) WHERE in_cart_item_id = ($2);`
-	qrUpdateCartToInactive = `UPDATE cart SET is_active = false and "date" = localtimestamp WHERE user_id = ($1) and is_active = true;`
-	qrNewInCartItem        = `INSERT INTO in_cart_item(item_id, quantity, cart_id)
-						      VALUES($1, $2, $3) ON CONFLICT (item_id, cart_id) DO
-					   	      UPDATE SET quantity = in_cart_item.quantity + $2;`
+	qrNewCart                   = `INSERT INTO cart(user_id, is_active) VALUES ($1, true);`
+	qrGetItems                  = `SELECT * FROM item;`
+	qrGetInCartItems            = `SELECT in_cart_item_id, item_id, quantity FROM in_active_cart_item WHERE cart_id = $1;`
+	qrGetActiveCartID           = `SELECT cart_id FROM cart WHERE user_id = $1 AND is_active = true;`
+	qrGetIsAvailable            = `SELECT is_available FROM item WHERE item_id = $1;`
+	qrDeleteInCartItemsByCartID = `DELETE FROM in_cart_item WHERE cart_id = $1;`
+	qrDeleteInCartItem          = `DELETE FROM in_cart_item WHERE in_cart_item_id = $1;`
+	qrUpdateInCartItem          = `UPDATE in_cart_item SET quantity = $1 WHERE in_cart_item_id = $2;`
+	qrUpdateCartToInactive      = `UPDATE cart SET is_active = false and "date" = localtimestamp WHERE user_id = $1 and is_active = true;`
+	qrNewInCartItem             = `INSERT INTO in_cart_item(item_id, quantity, cart_id)
+					  			   VALUES($1, $2, $3) ON CONFLICT (item_id, cart_id) DO
+								   UPDATE SET quantity = in_cart_item.quantity + $2;`
 )
 
 type Item struct {
@@ -50,25 +51,25 @@ func (i *Item) GetIsAvailable(storage *postgres.Storage, itemID int) error {
 	return nil
 }
 
-type Items []Item
-
-func (is *Items) GetItems(storage *postgres.Storage) error {
+func (i *Item) GetItems(storage *postgres.Storage) ([]Item, error) {
 	const op = "storage.postgres.entities.shop.GetItems"
 
 	qrResult, err := storage.DB.Query(qrGetItems)
 	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+
+	var is []Item
 
 	for qrResult.Next() {
 		var i Item
 		if err := qrResult.Scan(&i.ItemID, &i.Name, &i.Description, &i.Price, &i.PhotoPath, &i.IsAvailable); err != nil {
-			return fmt.Errorf("%s: %w", op, err)
+			return nil, fmt.Errorf("%s: %w", op, err)
 		}
-		*is = append(*is, i)
+		is = append(is, i)
 	}
 
-	return nil
+	return is, nil
 }
 
 type InCartItem struct {
@@ -96,6 +97,7 @@ func (ici *InCartItem) DeleteInCartItem(storage *postgres.Storage, inCartItemID 
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
+
 	return nil
 }
 
@@ -110,25 +112,25 @@ func (ici *InCartItem) UpdateInCartItem(storage *postgres.Storage, inCartItemID,
 	return nil
 }
 
-type InCartItems []InCartItem
-
-func (icis *InCartItems) GetInCartItems(storage *postgres.Storage, cartID int) error {
+func (ici *InCartItem) GetInCartItems(storage *postgres.Storage, cartID int) ([]InCartItem, error) {
 	const op = "storage.postgres.entities.shop.GetInCartItems"
 
 	qrResult, err := storage.DB.Query(qrGetInCartItems, cartID)
 	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+
+	var icis []InCartItem
 
 	for qrResult.Next() {
 		var ici InCartItem
 		if err := qrResult.Scan(&ici.InCartItemID, &ici.ItemID, &ici.Quantity); err != nil {
-			return fmt.Errorf("%s: %w", op, err)
+			return nil, fmt.Errorf("%s: %w", op, err)
 		}
-		*icis = append(*icis, ici)
+		icis = append(icis, ici)
 	}
 
-	return nil
+	return icis, nil
 }
 
 type Cart struct {
@@ -172,6 +174,17 @@ func (c *Cart) NewCart(storage *postgres.Storage, userID int) error {
 	const op = "storage.postgres.entities.shop.NewCart"
 
 	_, err := storage.DB.Exec(qrNewCart, userID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (c *Cart) EmptyCart(storage *postgres.Storage, userID int) error {
+	const op = "storage.postgres.entities.shop.EmptyCart"
+
+	_, err := storage.DB.Exec(qrDeleteInCartItemsByCartID, userID)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}

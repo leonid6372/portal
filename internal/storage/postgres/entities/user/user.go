@@ -44,7 +44,6 @@ func (u *User) GetUserById(storage *postgres.Storage) error {
 	return nil
 }
 
-// TO DO: Переписать под ORM
 func (u *User) ValidateUser(storage *postgres.Storage, username, password string) error {
 	const op = "storage.postgres.entities.user.ValidateUser"
 
@@ -58,38 +57,35 @@ func (u *User) ValidateUser(storage *postgres.Storage, username, password string
 		return fmt.Errorf("%s: wrong username", op)
 	}
 
-	var correctPassword string
-	if err := qrResult.Scan(&correctPassword); err != nil {
+	if err := qrResult.Scan(&u.Password); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	if password != correctPassword {
+	if password != u.Password { //Проверить
 		return fmt.Errorf("%s: wrong password", op)
 	}
 
 	return nil
 }
 
-// TO DO: Переписать под ORM
-func (u *User) GetUserID(storage *postgres.Storage, username string) (int, error) {
+func (u *User) GetUserID(storage *postgres.Storage, username string) error {
 	const op = "storage.postgres.entities.user.GetUserID"
 
 	qrResult, err := storage.DB.Query(qrGetUserIDByUsername, username)
 	if err != nil {
-		return 0, fmt.Errorf("%s: %w", op, err)
+		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	// Проверка на пустой ответ
 	if !qrResult.Next() {
-		return 0, fmt.Errorf("%s: wrong username", op)
+		return fmt.Errorf("%s: wrong username", op)
 	}
 
-	var userID int
-	if err := qrResult.Scan(&userID); err != nil {
-		return 0, fmt.Errorf("%s: %w", op, err)
+	if err := qrResult.Scan(&u.UserID); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	return userID, nil
+	return nil
 }
 
 type RefreshToken struct {

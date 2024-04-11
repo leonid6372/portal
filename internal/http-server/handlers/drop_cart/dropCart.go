@@ -1,4 +1,4 @@
-package order
+package dropCart
 
 import (
 	"errors"
@@ -21,7 +21,7 @@ type Response struct {
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.order.New"
+		const op = "handlers.dropCart.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -65,15 +65,16 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			}
 		}
 
-		// Переводим корзину с cartID в неактивное состояние
-		if err := c.UpdateCartToInactive(storage, c.CartID); err != nil {
-			log.Error("failed to make order", err)
+		// Очистка текущей корзины
+		err = c.EmptyCart(storage, c.CartID)
+		if err != nil {
+			log.Error("failed to empty cart")
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to make order: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to empty cart: "+err.Error()))
 			return
 		}
 
-		log.Info("order successfully made")
+		log.Info("cart successfully emptied")
 
 		render.JSON(w, r, resp.OK())
 	}

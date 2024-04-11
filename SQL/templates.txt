@@ -2,11 +2,11 @@ CREATE TABLE "user"(
 	user_id SERIAL PRIMARY KEY,
 	"1c" JSONB, balance INT,
 	access_lvl INT,
-	password varchar(50),
+	"password" varchar(50),
 	username varchar(50)
 );
 
-INSERT INTO "user"("1c", balance, access_lvl, password, username)
+INSERT INTO "user"("1c", balance, access_lvl, "password", username)
 VALUES ('{"username":"aa001", "test":"test"}'::jsonb, 100000, 0, '1111', 'aa001'),
        ('{"username":"aa002", "test":"test"}'::jsonb, 0, 5, '1111', 'aa002');
 
@@ -39,47 +39,28 @@ CREATE TABLE refresh_token(
 );
 
 CREATE VIEW in_active_cart_item AS
-(SELECT in_cart_item_id, in_cart_item.cart_id, item_id, quantity
-FROM in_cart_item
-JOIN cart ON in_cart_item.cart_id=cart.cart_id
-WHERE cart.is_active = true);
+	(SELECT in_cart_item_id, in_cart_item.cart_id, item_id, quantity
+	FROM in_cart_item
+	JOIN cart ON in_cart_item.cart_id=cart.cart_id
+	WHERE cart.is_active = true
+);
 
-create table place(
-place_id serial primary key,
-name varchar(64),
-properties text);
+CREATE TABLE place(
+	place_id SERIAL PRIMARY KEY,
+	name varchar(64),
+	properties text
+);
 
-create table reservation(
-reservation_id serial primary key,
-place_id int REFERENCES place(place_id) ON DELETE CASCADE,
-start timestamp,
-finish timestamp,
-user_id int REFERENCES "user"(user_id) ON DELETE CASCADE);
-
-CREATE VIEW actual_places AS
-(SELECT p.place_id, p.name, p.properties, true AS is_avalible FROM place AS p
-	JOIN reservation as r ON
-	(p.place_id = r.place_id AND
-	(r.start > localtimestamp OR r.finish < localtimestamp))
-	OR (p.place_id != r.place_id)
-
-	EXCEPT
-
-	SELECT p.place_id, p.name, p.properties, true AS is_avalible FROM place AS p
-	JOIN reservation as r ON
-	p.place_id = r.place_id AND
-	(r.start <= localtimestamp OR r.finish >= localtimestamp))
-
-	UNION
-
-	SELECT p.place_id, p.name, p.properties, false AS is_avalible FROM place AS p
-	JOIN reservation as r ON
-	p.place_id = r.place_id AND
-	(r.start <= localtimestamp OR r.finish >= localtimestamp)
-
-	order by place_id;
+CREATE TABLE reservation(
+	reservation_id SERIAL PRIMARY KEY,
+	place_id int REFERENCES place(place_id) ON DELETE CASCADE,
+	"start" timestamp,
+	finish timestamp,
+	user_id int REFERENCES "user"(user_id) ON DELETE CASCADE
+);
 
 CREATE VIEW place_and_reservation AS (
 	SELECT reservation.place_id, place.name, place.properties, reservation.start, reservation.finish
  	FROM reservation
- 	JOIN place ON reservation.place_id = place.place_id);
+ 	JOIN place ON reservation.place_id = place.place_id
+);

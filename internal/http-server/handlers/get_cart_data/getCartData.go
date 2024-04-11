@@ -8,7 +8,6 @@ import (
 	storageHandler "portal/internal/storage"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/shop"
-	"strconv"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
@@ -19,7 +18,7 @@ import (
 
 type Response struct {
 	resp.Response
-	InCartItems shop.InCartItems `json:"cart_data"`
+	InCartItems []shop.InCartItem `json:"cart_data"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
@@ -32,18 +31,18 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		)
 
 		// Получаем userID из токена авторизации
-		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]string)
-		userID, err := strconv.Atoi(tempUserID["user_id"])
-		if err != nil {
-			log.Error("failed to get user id from token claims")
+		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]int)
+		userID, ok := tempUserID["user_id"]
+		if !ok {
+			log.Error("no user id in token claims")
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to get user id from token claims: "+err.Error()))
+			render.JSON(w, r, resp.Error("no user id in token claims"))
 			return
 		}
 
 		// Запрос cart_id для вызывающего user_id
 		var c shop.Cart
-		err = c.GetActiveCartID(storage, userID)
+		err := c.GetActiveCartID(storage, userID)
 		if err != nil {
 			// Если ошибка не об отсутствии корзины, то выход по стнадартной ошибке БД
 			if !errors.As(err, &storageHandler.ErrCartDoesNotExist) {
@@ -69,8 +68,9 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		}
 
 		// Заполняем слайс товарами для нужной корзины из БД
-		var icis shop.InCartItems
-		if err := icis.GetInCartItems(storage, c.CartID); err != nil {
+		var ici *shop.InCartItem
+		icis, err := ici.GetInCartItems(storage, c.CartID)
+		if err != nil {
 			log.Error("failed to get in cart items", err)
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get in cart items: "+err.Error()))
@@ -83,7 +83,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, inCartItems shop.InCartItems) {
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, inCartItems []shop.InCartItem) {
 	response, err := json.Marshal(Response{
 		Response:    resp.OK(),
 		InCartItems: inCartItems,
