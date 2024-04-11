@@ -2,7 +2,6 @@ package oauth
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"reflect"
@@ -105,7 +104,7 @@ func (bs *BearerServer) UserCredentials(w http.ResponseWriter, r *http.Request) 
 	render.JSON(w, r, resp.OK())
 }
 
-// Generate token responseonse
+// Generate token response
 func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential string, secret string, refreshToken string, scope string, code string, redirectURI string, r *http.Request) (interface{}, int) {
 	var response *TokenResponse
 	switch grantType {
@@ -127,8 +126,6 @@ func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential st
 			return "Token generation failed, check security provider", http.StatusInternalServerError
 		}
 	case RefreshTokenGrant:
-		fmt.Println(secret)
-		fmt.Println(refreshToken)
 		refresh, err := bs.provider.DecryptRefreshTokens(refreshToken)
 		if err != nil {
 			return "Not authorized", http.StatusUnauthorized
@@ -183,7 +180,7 @@ func (bs *BearerServer) cryptTokens(token *Token, refresh *RefreshToken, r *http
 		return nil, err
 	}
 
-	tokenResponseonse := &TokenResponse{Token: cToken, RefreshToken: cRefreshToken, ExpiresIn: (int64)(bs.TokenTTL / time.Second)}
+	tokenResponse := &TokenResponse{Token: cToken, RefreshToken: cRefreshToken, ExpiresIn: (int64)(bs.TokenTTL / time.Second)}
 
-	return tokenResponseonse, nil
+	return tokenResponse, nil
 }

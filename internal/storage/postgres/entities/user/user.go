@@ -61,7 +61,7 @@ func (u *User) ValidateUser(storage *postgres.Storage, username, password string
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	if password != u.Password { //Проверить
+	if password != u.Password {
 		return fmt.Errorf("%s: wrong password", op)
 	}
 

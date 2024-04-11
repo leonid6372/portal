@@ -14,7 +14,6 @@ type Config struct {
 	SQLStorage   `yaml:"sql_storage"`
 	HTTPServer   `yaml:"http_server"`
 	BearerServer `yaml:"bearer_server"`
-	TokenTTL     time.Duration `yaml:"token_ttl" end-default:2h"`
 }
 
 type SQLStorage struct {

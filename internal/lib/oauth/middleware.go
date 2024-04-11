@@ -3,7 +3,6 @@ package oauth
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"reflect"
@@ -93,7 +92,7 @@ func (ba *BearerAuthentication) checkAuthorization(auth string, w http.ResponseW
 			default:
 				http.Error(w, "server error", http.StatusInternalServerError)
 			}
-			return nil, fmt.Errorf("Not authorized")
+			return nil, errors.New("Not authorized")
 		}
 		refreshToken := string([]byte(cookie.Value))
 		response, statusCode := ba.BearerServer.generateTokenResponse(GrantType("refresh_token"), "", "", refreshToken, scope, "", "", r)

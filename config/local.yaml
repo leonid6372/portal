@@ -9,4 +9,4 @@ http_server: # конфигурация нашего http-сервера
   idle_timeout: 30s
 bearer_server:
   secret_path: "C:/Users/Leonid/Desktop/portal/internal/lib/oauth/secret.txt" #расположение секрета для генерации токенов
-  token_ttl: "5s" # время жизни access token
+  token_ttl: "2h" # время жизни access token
