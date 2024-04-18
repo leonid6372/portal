@@ -21,8 +21,9 @@ import (
 	updateCartItem "portal/internal/http-server/handlers/update_cart_item"
 	userReservations "portal/internal/http-server/handlers/user_reservations"
 
-	"portal/internal/lib/auth"
+	setupLogger "portal/internal/lib/logger/setup_logger"
 	"portal/internal/lib/logger/sl"
+	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
 	"syscall"
 	"time"
@@ -31,29 +32,26 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-const (
-	logLVLInfo  = "info"
-	logLVLDebug = "debug"
-	logLVLWarn  = "warning"
-	logLVLError = "error"
-)
-
 func main() {
 	cfg := config.MustLoad()
 
-	log := setupLogger(cfg.LogLVL)
+	log := setupLogger.New(cfg.LogLVL)
 
 	storage, err := postgres.New(cfg.SQLStorage)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
 	}
+	defer func() {
+		storage.DB.Close()
+		log.Info("storage closed")
+	}()
 
-	err = auth.InitBearerServer(log, storage, cfg.TokenTTL)
-	if err != nil {
-		log.Error("failed to init bearer server", sl.Err(err))
-		os.Exit(1)
-	}
+	bearerServer := oauth.NewBearerServer(
+		cfg.BearerServer.Secret,
+		cfg.BearerServer.TokenTTL,
+		&oauth.UserVerifier{Storage: storage, Log: log},
+		nil)
 
 	router := chi.NewRouter()
 
@@ -62,7 +60,7 @@ func main() {
 	router.Use(middleware.Recoverer) // Если где-то внутри сервера (обработчика запроса) произойдет паника, приложение не должно упасть
 	router.Use(middleware.URLFormat) // Парсер URLов поступающих запросов
 
-	routeAPI(router, log, storage)
+	routeAPI(router, log, bearerServer, cfg.BearerServer.Secret, storage)
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 
@@ -98,33 +96,14 @@ func main() {
 		return
 	}
 
-	// TODO: close storage
-
 	log.Info("server stopped")
 }
 
-func setupLogger(logLVL string) *slog.Logger {
-	var log *slog.Logger
-
-	switch logLVL {
-	case logLVLInfo:
-		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	case logLVLDebug:
-		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	case logLVLWarn:
-		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	case logLVLError:
-		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	}
-
-	return log
-}
-
-func routeAPI(router *chi.Mux, log *slog.Logger, storage *postgres.Storage) {
+func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServer, secret string, storage *postgres.Storage) {
 	//Secured API group
 	router.Group(func(r chi.Router) {
 		// use the Bearer Authentication middleware
-		r.Use(auth.GetAuthHandler(log))
+		r.Use(oauth.Authorize(secret, nil, bearerServer, log))
 		r.Post("/api/reservation", reservationHandler.New(log, storage))
 		r.Get("/api/reservation_list", reservationList.New(log, storage))
 		r.Get("/api/user_reservations", userReservations.New(log, storage))
@@ -134,8 +113,8 @@ func routeAPI(router *chi.Mux, log *slog.Logger, storage *postgres.Storage) {
 		r.Get("/api/profile", profile.New(log, storage))
 
 		r.Get("/api/shop_list", shopList.New(log, storage))
-		r.Post("/api/order", order.New(log, storage))
 
+		r.Post("/api/order", order.New(log, storage))
 		r.Post("/api/drop_cart_item", dropCartItem.New(log, storage))
 		r.Post("/api/update_cart_item", updateCartItem.New(log, storage))
 		r.Post("/api/drop_cart", dropCart.New(log, storage))
@@ -146,7 +125,6 @@ func routeAPI(router *chi.Mux, log *slog.Logger, storage *postgres.Storage) {
 
 	// Public API group
 	router.Group(func(r chi.Router) {
-		r.Post("/api/login", auth.GetBearerServer().UserCredentialsPassword)
-		r.Post("/api/refresh", auth.GetBearerServer().UserCredentialsRefresh)
+		r.Post("/api/login", bearerServer.UserCredentials)
 	})
 }

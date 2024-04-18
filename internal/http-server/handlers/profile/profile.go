@@ -3,7 +3,6 @@ package profile
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"log/slog"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/go-chi/render"
 
 	resp "portal/internal/lib/api/response"
+	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/user"
@@ -19,19 +19,13 @@ import (
 // Временная вспомогательная структура
 type Data1C struct {
 	Position  string `json:"position"`
-	FullName  string `json:"fullName"`
-	PhotoPath string `json:"photoPath"`
-}
-
-// Временная вспомогательная структура
-type UserInfo struct {
-	Balance int    `json:"balance"`
-	Data    Data1C `json:"data"`
+	FullName  string `json:"full_name"`
+	PhotoPath string `json:"photo_path"`
 }
 
 type Response struct {
 	resp.Response
-	Profile UserInfo `json:"profile"`
+	Profile Data1C `json:"profile"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
@@ -43,56 +37,50 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]string)
-		userID, err := strconv.Atoi(tempUserID["user_id"])
-		if err != nil {
-			log.Error("failed to get user id from token claimss")
+		// Получаем userID из токена авторизации
+		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]int)
+		userID, ok := tempUserID["user_id"]
+		if !ok {
+			log.Error("no user id in token claims")
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to get user id from token claims"))
+			render.JSON(w, r, resp.Error("no user id in token claims"))
 			return
 		}
 
-		var u user.User
-		u.UserID = userID
-		err = u.GetUserById(storage)
+		// Получаем данные пользователя по user id из БД
+		u := user.User{UserID: userID}
+		err := u.GetUserById(storage)
 		if err != nil {
-			log.Error("failed to get user info")
-
+			log.Error("failed to get profile", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get user info"))
-
+			render.JSON(w, r, resp.Error("failed to get profile: "+err.Error()))
 			return
 		}
 
-		log.Info("shop list gotten")
+		log.Info("profile data successfully gotten")
 
+		// Декодируем полученный из БД JSON с данными профиля
 		var data1C Data1C
 		if err = json.Unmarshal([]byte(u.Data1C), &data1C); err != nil {
-			log.Error("failed to process response")
-
+			log.Error("failed to process response", sl.Err(err))
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to process response"))
-
+			render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 			return
 		}
 
-		userInfo := UserInfo{Balance: u.Balance, Data: data1C}
-
-		responseOK(w, r, log, userInfo)
+		responseOK(w, r, log, data1C)
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, userInfo UserInfo) {
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, profile Data1C) {
 	response, err := json.Marshal(Response{
 		Response: resp.OK(),
-		Profile:  userInfo,
+		Profile:  profile,
 	})
 	if err != nil {
-		log.Error("failed to process response")
-
+		log.Error("failed to process response", sl.Err(err))
 		w.WriteHeader(500)
-		render.JSON(w, r, resp.Error("failed to process response"))
-
+		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 		return
 	}
 

@@ -1,13 +1,15 @@
-package drop_cart
+
+package dropCart
 
 import (
+	"errors"
 	"net/http"
 	resp "portal/internal/lib/api/response"
+	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
+	storageHandler "portal/internal/storage"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/shop"
-	"strconv"
-
 	"log/slog"
 
 	"github.com/go-chi/chi/middleware"
@@ -20,7 +22,8 @@ type Response struct {
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.addCartItem.New"
+		const op = "handlers.dropCart.New"
+
 
 		log := log.With(
 			slog.String("op", op),
@@ -28,30 +31,52 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		)
 
 		// Получаем userID из токена авторизации
-		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]string)
-		userID, err := strconv.Atoi(tempUserID["user_id"])
-		if err != nil {
-			log.Error("failed to get user id from token claims")
+		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]int)
+		userID, ok := tempUserID["user_id"]
+		if !ok {
+			log.Error("no user id in token claims")
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to get user id from token claims"))
+			render.JSON(w, r, resp.Error("no user id in token claims"))
 			return
 		}
 
-		// Запрос и проверка доступности item для заказа
-		var c *shop.Cart
-		err = c.DropCart(storage, userID)
-
-		// Обработка общего случая ошибки БД
+		// Запрос cart_id для вызывающего user_id
+		var c shop.Cart
+		err := c.GetActiveCartID(storage, userID)
 		if err != nil {
-			log.Error(err.Error())
+			// Если ошибка не об отсутствии корзины, то выход по стнадартной ошибке БД
+			if !errors.As(err, &storageHandler.ErrCartDoesNotExist) {
+				log.Error("failed to get active cart id", sl.Err(err))
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				return
+			}
+			// Если ошибка выше была об отсутствии корзины, то создаем корзину
+			if err := c.NewCart(storage, userID); err != nil {
+				log.Error("failed to create new cart", sl.Err(err))
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to create cart: "+err.Error()))
+				return
+			}
+			// Получаем номер созданной корзины
+			if err := c.GetActiveCartID(storage, userID); err != nil {
+				log.Error("failed to get active cart id", sl.Err(err))
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				return
+			}
+		}
 
+		// Очистка текущей корзины
+		err = c.EmptyCart(storage, c.CartID)
+		if err != nil {
+			log.Error("failed to empty cart", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to drop item"))
-
+			render.JSON(w, r, resp.Error("failed to empty cart: "+err.Error()))
 			return
 		}
 
-		log.Info("item successfully added in cart")
+		log.Info("cart successfully emptied")
 
 		render.JSON(w, r, resp.OK())
 	}

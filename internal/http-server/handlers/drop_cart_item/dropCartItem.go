@@ -17,7 +17,7 @@ import (
 )
 
 type Request struct {
-	InCartItemID int `json:"in_cart_item_id,omitempty" validate:"required"`
+	InCartItemID int `json:"in_cart_item_id" validate:"required"`
 }
 
 type Response struct {
@@ -37,22 +37,18 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 		// Декодируем json запроса
 		err := render.DecodeJSON(r.Body, &req)
+		// Такую ошибку встретим, если получили запрос с пустым телом.
+		// Обработаем её отдельно
 		if errors.Is(err, io.EOF) {
-			// Такую ошибку встретим, если получили запрос с пустым телом.
-			// Обработаем её отдельно
 			log.Error("request body is empty")
-
 			w.WriteHeader(400)
 			render.JSON(w, r, resp.Error("empty request"))
-
 			return
 		}
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
-
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request"))
-
+			render.JSON(w, r, resp.Error("failed to decode request: "+err.Error()))
 			return
 		}
 
@@ -61,29 +57,22 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Валидация обязательных полей запроса
 		if err := validator.New().Struct(req); err != nil {
 			validateErr := err.(validator.ValidationErrors)
-
 			w.WriteHeader(400)
 			log.Error("invalid request", sl.Err(err))
-
 			render.JSON(w, r, resp.ValidationError(validateErr))
-
 			return
 		}
 
+		// Удаление item из корзины
 		var ici *shop.InCartItem
-		err = ici.DropCartItem(storage, req.InCartItemID)
-
-		// Обработка общего случая ошибки БД
-		if err != nil {
-			log.Error(err.Error())
-
+		if err := ici.DeleteInCartItem(storage, req.InCartItemID); err != nil {
+			log.Error("failed to delete in cart item", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to drop item"))
-
+			render.JSON(w, r, resp.Error("failed to delete in cart item: "+err.Error()))
 			return
 		}
 
-		log.Info("item successfully dropped")
+		log.Info("item successfully deleted")
 
 		render.JSON(w, r, resp.OK())
 	}

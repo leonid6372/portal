@@ -9,9 +9,10 @@ import (
 	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/shop"
-	"strconv"
 
 	"log/slog"
+
+	storageHandler "portal/internal/storage"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
@@ -19,8 +20,8 @@ import (
 )
 
 type Request struct {
-	ItemID   int `json:"item_id,omitempty" validate:"required"`
-	Quantity int `json:"quantity,omitempty" validate:"required"`
+	ItemID   int `json:"item_id" validate:"required"`
+	Quantity int `json:"quantity" validate:"required"`
 }
 
 type Response struct {
@@ -51,7 +52,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request"))
+			render.JSON(w, r, resp.Error("failed to decode request: "+err.Error()))
 			return
 		}
 
@@ -67,19 +68,19 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		}
 
 		// Получаем userID из токена авторизации
-		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]string)
-		userID, err := strconv.Atoi(tempUserID["user_id"])
-		if err != nil {
-			log.Error("failed to get user id from token claims")
+		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]int)
+		userID, ok := tempUserID["user_id"]
+		if !ok {
+			log.Error("no user id in token claims")
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to get user id from token claims"))
+			render.JSON(w, r, resp.Error("no user id in token claims"))
 			return
 		}
 
 		// Запрос и проверка доступности item для заказа
 		var i shop.Item
 		if err := i.GetIsAvailable(storage, req.ItemID); err != nil {
-			log.Error("failed to get item status", err)
+			log.Error("failed to get item status", sl.Err(err))
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get item status: "+err.Error()))
 			return
@@ -93,19 +94,37 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 		// Запрос cart_id для вызывающего user_id
 		var c shop.Cart
-		if err := c.GetCartId(storage, userID); err != nil {
-			log.Error("failed to get cart id", err)
-			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get cart id"+err.Error()))
-			return
+		err = c.GetActiveCartID(storage, userID)
+		if err != nil {
+			// Если ошибка не об отсутствии корзины, то выход по стнадартной ошибке БД
+			if !errors.As(err, &storageHandler.ErrCartDoesNotExist) {
+				log.Error("failed to get active cart id", sl.Err(err))
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				return
+			}
+			// Если ошибка выше была об отсутствии корзины, то создаем корзину
+			if err := c.NewCart(storage, userID); err != nil {
+				log.Error("failed to create new cart", sl.Err(err))
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to create cart: "+err.Error()))
+				return
+			}
+			// Получаем номер созданной корзины
+			if err := c.GetActiveCartID(storage, userID); err != nil {
+				log.Error("failed to get active cart id", sl.Err(err))
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				return
+			}
 		}
 
 		// Добавление item в корзину
 		var ici shop.InCartItem
 		if err := ici.NewInCartItem(storage, req.ItemID, req.Quantity, c.CartID); err != nil {
-			log.Error("failed to add item in cart", err)
+			log.Error("failed to add item in cart", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to add item in cart"+err.Error()))
+			render.JSON(w, r, resp.Error("failed to add item in cart: "+err.Error()))
 			return
 		}
 

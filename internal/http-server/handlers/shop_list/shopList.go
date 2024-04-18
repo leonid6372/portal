@@ -10,13 +10,14 @@ import (
 	"github.com/go-chi/render"
 
 	resp "portal/internal/lib/api/response"
+	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/shop"
 )
 
 type Response struct {
 	resp.Response
-	ShopList []shop.Item `json:"shopList"`
+	Items []shop.Item `json:"shop_list"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
@@ -28,44 +29,31 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		var i *shop.Item
-		rawShopList, err := i.GetShopList(storage)
+		// Получаем слайс товаров
+		var i shop.Item
+		is, err := i.GetItems(storage)
 		if err != nil {
-			log.Error("failed to get shop list")
-
+			log.Error("failed to get shop list", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get shop list"))
-
+			render.JSON(w, r, resp.Error("failed to get shop list: "+err.Error()))
 			return
 		}
 
 		log.Info("shop list gotten")
 
-		var shopList []shop.Item
-		if err = json.Unmarshal([]byte(rawShopList), &shopList); err != nil {
-			log.Error("failed to process response")
-
-			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to process response"))
-
-			return
-		}
-
-		responseOK(w, r, log, shopList)
+		responseOK(w, r, log, is)
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, shopList []shop.Item) {
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, items []shop.Item) {
 	response, err := json.Marshal(Response{
 		Response: resp.OK(),
-		ShopList: shopList,
+		Items:    items,
 	})
 	if err != nil {
-		log.Error("failed to process response")
-
+		log.Error("failed to process response", sl.Err(err))
 		w.WriteHeader(500)
-		render.JSON(w, r, resp.Error("failed to process response"))
-
+		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
 		return
 	}
 

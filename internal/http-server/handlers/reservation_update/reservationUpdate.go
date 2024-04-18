@@ -9,18 +9,18 @@ import (
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/reservation"
+	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Request struct {
-	ReservationID int              `json:"reservationId,omitempty" validate:"required"`
-	PlaceID       int              `json:"placeId,omitempty" validate:"required"`
-	Start         pgtype.Timestamp `json:"start,omitempty" validate:"required"`
-	Finish        pgtype.Timestamp `json:"finish,omitempty" validate:"required"`
+	ReservationID int       `json:"reservation_id" validate:"required"`
+	PlaceID       int       `json:"place_id" validate:"required"`
+	Start         time.Time `json:"start" validate:"required"`
+	Finish        time.Time `json:"finish" validate:"required"`
 }
 
 type Response struct {
@@ -44,18 +44,14 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Обработаем её отдельно
 		if errors.Is(err, io.EOF) {
 			log.Error("request body is empty")
-
 			w.WriteHeader(400)
 			render.JSON(w, r, resp.Error("empty request"))
-
 			return
 		}
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
-
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request"))
-
+			render.JSON(w, r, resp.Error("failed to decode request: "+err.Error()))
 			return
 		}
 
@@ -64,25 +60,19 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Валидация обязательных полей запроса
 		if err := validator.New().Struct(req); err != nil {
 			validateErr := err.(validator.ValidationErrors)
-
 			w.WriteHeader(400)
 			log.Error("invalid request", sl.Err(err))
-
 			render.JSON(w, r, resp.ValidationError(validateErr))
-
 			return
 		}
 
+		// Обновление записи бронирования в БД
 		var reservation *reservation.Reservation
-		err = reservation.ReservationUpdate(storage, req.ReservationID, req.PlaceID, req.Start, req.Finish)
-
-		// Обработка общего случая ошибки БД
+		err = reservation.UpdateReservation(storage, req.ReservationID, req.PlaceID, req.Start, req.Finish)
 		if err != nil {
-			log.Error(err.Error())
-
+			log.Error("failed to update reservation", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to update reservation"))
-
+			render.JSON(w, r, resp.Error("failed to update reservation: "+err.Error()))
 			return
 		}
 
