@@ -1,3 +1,4 @@
+
 package dropCart
 
 import (
@@ -9,7 +10,6 @@ import (
 	storageHandler "portal/internal/storage"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/shop"
-
 	"log/slog"
 
 	"github.com/go-chi/chi/middleware"
@@ -23,6 +23,7 @@ type Response struct {
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.dropCart.New"
+
 
 		log := log.With(
 			slog.String("op", op),
