@@ -31,7 +31,7 @@ type Place struct {
 
 type ActualPlace struct {
 	Place
-	IsAvailable bool `json:"is_available"`
+	IsAvailable bool `json:"is_available,omitempty"`
 }
 
 func (ap *ActualPlace) GetActualPlaces(storage *postgres.Storage, properties string, start, finish time.Time) ([]ActualPlace, error) {
@@ -96,7 +96,7 @@ func (r *Reservation) DeleteReservation(storage *postgres.Storage, reservationID
 	return nil
 }
 
-type Reservations []Reservation
+type Reservations []Reservation // <- <- <- !Переделать! <- <- <-
 
 func (rs *Reservations) GetReservationsByUserID(storage *postgres.Storage, userID int) error {
 	const op = "storage.postgres.entities.reservation.GetReservationsByUserID" // Имя текущей функции для логов и ошибок

@@ -6,6 +6,7 @@ import (
 )
 
 const (
+	qrGetRole                   = `SELECT "role" FROM "user" WHERE username = $1;`
 	qrGetPassByUsername         = `SELECT "password" FROM "user" WHERE username = $1;`
 	qrGetUserIDByUsername       = `SELECT user_id FROM "user" WHERE username = $1;`
 	qrGetUserById               = `SELECT "1c" FROM "user" WHERE user_id = $1;`
@@ -16,12 +17,12 @@ const (
 )
 
 type User struct {
-	UserID    int    `json:"user_id,omitempty"`
-	Data1C    string `json:"data_1c,omitempty"`
-	Username  string `json:"username,omitempty"`
-	Balance   int    `json:"balance,omitempty"`
-	Password  string `json:"password,omitempty"`
-	AccessLVL int    `json:"access_lvl,omitempty"`
+	UserID   int    `json:"user_id,omitempty"`
+	Data1C   string `json:"data_1c,omitempty"`
+	Username string `json:"username,omitempty"`
+	Balance  int    `json:"balance,omitempty"`
+	Password string `json:"password,omitempty"`
+	Role     int    `json:"role,omitempty"`
 }
 
 func (u *User) GetUserById(storage *postgres.Storage) error {
@@ -63,6 +64,10 @@ func (u *User) ValidateUser(storage *postgres.Storage, username, password string
 
 	if password != u.Password {
 		return fmt.Errorf("%s: wrong password", op)
+	}
+
+	if err := storage.DB.QueryRow(qrGetRole, username).Scan(&u.Role); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	return nil

@@ -1,26 +1,24 @@
-package reservationUpdate
+package editComment
 
 import (
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
-	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
-	"portal/internal/storage/postgres/entities/reservation"
-	"time"
+	"portal/internal/storage/postgres/entities/news"
 
-	"github.com/go-chi/chi/v5/middleware"
+	resp "portal/internal/lib/api/response"
+
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 )
 
 type Request struct {
-	ReservationID int       `json:"reservation_id" validate:"required"`
-	PlaceID       int       `json:"place_id" validate:"required"`
-	Start         time.Time `json:"start" validate:"required"`
-	Finish        time.Time `json:"finish" validate:"required"`
+	CommentID int    `json:"comment_id" validate:"required"`
+	Text      string `json:"text" validate:"required"`
 }
 
 type Response struct {
@@ -29,7 +27,7 @@ type Response struct {
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.reservationUpdate.New"
+		const op = "handlers.editComment.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -60,23 +58,23 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Валидация обязательных полей запроса
 		if err := validator.New().Struct(req); err != nil {
 			validateErr := err.(validator.ValidationErrors)
-			w.WriteHeader(400)
 			log.Error("invalid request", sl.Err(err))
+			w.WriteHeader(400)
 			render.JSON(w, r, resp.ValidationError(validateErr))
 			return
 		}
 
-		// Обновление записи бронирования в БД
-		var reservation *reservation.Reservation
-		err = reservation.UpdateReservation(storage, req.ReservationID, req.PlaceID, req.Start, req.Finish)
+		// Обновляем значение текста комментария в БД
+		var c news.Comment
+		err = c.UpdateCommentText(storage, req.CommentID, req.Text)
 		if err != nil {
-			log.Error("failed to update reservation", sl.Err(err))
+			log.Error("failed to update comment text", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to update reservation"))
+			render.JSON(w, r, resp.Error("failed to update comment text"))
 			return
 		}
 
-		log.Info("reservation successfully updated")
+		log.Info("comment successfully updated")
 
 		render.JSON(w, r, resp.OK())
 	}

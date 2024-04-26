@@ -15,25 +15,25 @@ type UserVerifier struct {
 	Log     *slog.Logger
 }
 
-// ValidateUser validates username and password returning an error if the user credentials are wrong
-func (uv *UserVerifier) ValidateUser(username, password, scope string, r *http.Request) error {
+// ValidateUser validates username and password returning an scope value and an error if the user credentials are wrong
+func (uv *UserVerifier) ValidateUser(username, password string, r *http.Request) (int, error) {
 	const op = "lib.oauth.ValidateUser"
 	log := uv.Log.With(slog.String("op", op))
 
-	var user user.User
-	err := user.ValidateUser(uv.Storage, username, password)
+	var u user.User
+	err := u.ValidateUser(uv.Storage, username, password)
 	if err != nil {
-		log.Warn("user validation error", sl.Err(err))
-		return errors.New("user validation error: " + err.Error())
+		log.Error("user validation error", sl.Err(err))
+		return 0, errors.New("user validation error: " + err.Error())
 	}
 
 	log.Info("username " + username + " successfully validated")
 
-	return nil
+	return u.Role, nil
 }
 
 // AddClaims provides additional claims to the token
-func (uv *UserVerifier) AddClaims(credential, tokenID, scope string, r *http.Request) (map[string]int, error) {
+func (uv *UserVerifier) AddClaims(credential, tokenID string, scope int, r *http.Request) (map[string]int, error) {
 	const op = "lib.oauth.AddClaims"
 	log := uv.Log.With(slog.String("op", op))
 

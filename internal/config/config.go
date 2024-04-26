@@ -30,7 +30,7 @@ type HTTPServer struct {
 type BearerServer struct {
 	SecretPath string `yaml:"secret_path" env-required:"true"`
 	Secret     string
-	TokenTTL   time.Duration `yaml:"token_ttl" end-default:2h"`
+	TokenTTL   time.Duration `yaml:"token_ttl" end-default:"2h"`
 }
 
 func MustLoad() *Config {
