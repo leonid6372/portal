@@ -3,6 +3,7 @@ package oauth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"reflect"
@@ -103,9 +104,18 @@ func (ba *BearerAuthentication) checkAuthorization(auth string, w http.ResponseW
 		return nil, errors.New("Invalid token: " + err.Error())
 	}
 	if time.Now().UTC().After(token.CreationDate.Add(token.ExpiresIn)) {
-		scope := r.FormValue("scope")
-		refreshToken := auth
-		response, statusCode := ba.BearerServer.generateTokenResponse(GrantType("refresh_token"), "", "", refreshToken, scope, "", "", r)
+		cookie, err := r.Cookie("refresh_token")
+		if err != nil {
+			switch {
+			case errors.Is(err, http.ErrNoCookie):
+				http.Error(w, "cookie not found", http.StatusBadRequest)
+			default:
+				http.Error(w, "server error", http.StatusInternalServerError)
+			}
+			return nil, fmt.Errorf("Not authorized: " + err.Error())
+		}
+		refreshToken := cookie.Value
+		response, statusCode := ba.BearerServer.generateTokenResponse(GrantType("refresh_token"), "", "", refreshToken, "", "", r)
 
 		if statusCode != 200 {
 			return nil, errors.New("Error while token generating: " + reflect.ValueOf(response).String())

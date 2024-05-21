@@ -15,6 +15,7 @@ const (
 	qrGetInCartItems            = `SELECT in_cart_item_id, item_id, quantity FROM in_active_cart_item WHERE cart_id = $1;`
 	qrGetActiveCartID           = `SELECT cart_id FROM cart WHERE user_id = $1 AND is_active = true;`
 	qrGetIsAvailable            = `SELECT is_available FROM item WHERE item_id = $1;`
+	qrDeleteItem                = `DELETE FROM item WHERE item_id = $1;`
 	qrDeleteInCartItemsByCartID = `DELETE FROM in_cart_item WHERE cart_id = $1;`
 	qrDeleteInCartItem          = `DELETE FROM in_cart_item WHERE in_cart_item_id = $1;`
 	qrUpdateInCartItem          = `UPDATE in_cart_item SET quantity = $1 WHERE in_cart_item_id = $2;`
@@ -31,6 +32,17 @@ type Item struct {
 	Price       int    `json:"price,omitempty"`
 	PhotoPath   string `json:"photo_path,omitempty"`
 	IsAvailable bool   `json:"is_available,omitempty"`
+}
+
+func (i *Item) DeleteItem(storage *postgres.Storage, itemID int) error {
+	const op = "storage.postgres.entities.shop.DeleteItem"
+
+	_, err := storage.DB.Exec(qrDeleteItem, itemID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }
 
 func (i *Item) GetIsAvailable(storage *postgres.Storage, itemID int) error {
@@ -63,11 +75,10 @@ func (i *Item) GetItems(storage *postgres.Storage) ([]Item, error) {
 	var is []Item
 
 	for qrResult.Next() {
-		var i Item
 		if err := qrResult.Scan(&i.ItemID, &i.Name, &i.Description, &i.Price, &i.PhotoPath, &i.IsAvailable); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
-		is = append(is, i)
+		is = append(is, *i)
 	}
 
 	return is, nil

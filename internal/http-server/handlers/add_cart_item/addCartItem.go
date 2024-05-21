@@ -61,8 +61,8 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Валидация обязательных полей запроса
 		if err := validator.New().Struct(req); err != nil {
 			validateErr := err.(validator.ValidationErrors)
-			w.WriteHeader(400)
 			log.Error("invalid request", sl.Err(err))
+			w.WriteHeader(400)
 			render.JSON(w, r, resp.ValidationError(validateErr))
 			return
 		}
@@ -88,7 +88,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if !i.IsAvailable {
 			log.Error("item is not available")
 			w.WriteHeader(406)
-			render.JSON(w, r, resp.Error("item is not available"))
+			render.JSON(w, r, resp.Alert("Выбранный товар недоступен. Перезагрузите страницу."))
 			return
 		}
 

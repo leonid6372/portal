@@ -1,14 +1,10 @@
 CREATE TABLE "user"(
 	user_id SERIAL PRIMARY KEY,
 	"1c" JSONB, balance INT,
-	access_lvl INT,
+	"role" INT NOT NULL,
 	"password" varchar(50),
 	username varchar(50)
 );
-
-INSERT INTO "user"("1c", balance, access_lvl, "password", username)
-VALUES ('{"username":"aa001", "test":"test"}'::jsonb, 100000, 0, '1111', 'aa001'),
-       ('{"username":"aa002", "test":"test"}'::jsonb, 0, 5, '1111', 'aa002');
 
 CREATE TABLE item(
 	item_id SERIAL PRIMARY KEY,
@@ -63,4 +59,58 @@ CREATE VIEW place_and_reservation AS (
 	SELECT reservation.place_id, place.name, place.properties, reservation.start, reservation.finish
  	FROM reservation
  	JOIN place ON reservation.place_id = place.place_id
+);
+
+CREATE TABLE post(
+	post_id SERIAL PRIMARY KEY,
+	title varchar(256),
+	"text" text,
+	creation_date timestamp NOT NULL,
+	update_date timestamp
+);
+
+CREATE TABLE post_image(
+	post_image_id SERIAL PRIMARY KEY,
+	post_id INT REFERENCES post(post_id) ON DELETE CASCADE,
+	"path" TEXT NOT NULL
+);
+
+CREATE TABLE tag(
+	tag_id SERIAL PRIMARY KEY,
+	"name" varchar(50) UNIQUE NOT NULL,
+	color varchar(16) UNIQUE NOT NULL
+);
+
+CREATE TABLE in_post_tag(
+	in_post_tag_id SERIAL PRIMARY KEY,
+	tag_id INT REFERENCES tag(tag_id) ON DELETE CASCADE,
+	post_id INT REFERENCES post(post_id) ON DELETE CASCADE
+);
+
+CREATE TABLE "like"(
+	user_id INT REFERENCES "user"(user_id) ON DELETE CASCADE,
+	post_id INT REFERENCES post(post_id) ON DELETE CASCADE
+);
+
+ALTER TABLE "like" ADD CONSTRAINT like_constraint UNIQUE (user_id, post_id);
+
+CREATE TABLE comment(
+	comment_id SERIAL PRIMARY KEY,
+	user_id INT REFERENCES "user"(user_id) ON DELETE CASCADE,
+	post_id INT REFERENCES post(post_id) ON DELETE CASCADE,
+	"text" text,
+	creation_date timestamp NOT NULL,
+	update_date timestamp
+);
+
+CREATE VIEW likes_amount AS (
+	SELECT post_id, COUNT(user_id) AS likes_amount
+	FROM "like"
+	GROUP BY post_id
+);
+
+CREATE VIEW post_tags AS (
+	SELECT in_post_tag.post_id, tag.*
+	FROM in_post_tag
+	JOIN tag ON in_post_tag.tag_id = tag.tag_id
 );

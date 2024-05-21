@@ -10,11 +10,13 @@ import (
 type Response struct {
 	Status string      `json:"status"`
 	Error  interface{} `json:"error,omitempty"`
+	Alert  interface{} `json:"alert,omitempty"`
 }
 
 const (
 	StatusOK    = "OK"
 	StatusError = "Error"
+	StatusAlert = "Alert"
 )
 
 func OK() Response {
@@ -27,6 +29,13 @@ func Error(msg interface{}) Response {
 	return Response{
 		Status: StatusError,
 		Error:  msg,
+	}
+}
+
+func Alert(msg interface{}) Response {
+	return Response{
+		Status: StatusAlert,
+		Alert:  msg,
 	}
 }
 

@@ -8,9 +8,15 @@ import (
 	"os/signal"
 	"portal/internal/config"
 	addCartItem "portal/internal/http-server/handlers/add_cart_item"
+	article "portal/internal/http-server/handlers/article"
+	articles "portal/internal/http-server/handlers/articles"
+	comment "portal/internal/http-server/handlers/comment"
+	deleteItem "portal/internal/http-server/handlers/delete_item"
 	dropCart "portal/internal/http-server/handlers/drop_cart"
 	dropCartItem "portal/internal/http-server/handlers/drop_cart_item"
+	editComment "portal/internal/http-server/handlers/edit_comment"
 	cartData "portal/internal/http-server/handlers/get_cart_data"
+	like "portal/internal/http-server/handlers/like"
 	"portal/internal/http-server/handlers/order"
 	profile "portal/internal/http-server/handlers/profile"
 	reservationHandler "portal/internal/http-server/handlers/reservation"
@@ -77,7 +83,7 @@ func main() {
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
-			log.Error("failed to start server")
+			log.Error("failed to start server", sl.Err(err))
 		}
 	}()
 
@@ -91,7 +97,7 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Error("failed to stop server")
+		log.Error("failed to stop server", sl.Err(err))
 
 		return
 	}
@@ -113,14 +119,19 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 		r.Get("/api/profile", profile.New(log, storage))
 
 		r.Get("/api/shop_list", shopList.New(log, storage))
-
+		r.Post("/api/add_cart_item", addCartItem.New(log, storage))
 		r.Post("/api/order", order.New(log, storage))
+		r.Get("/api/cart_data", cartData.New(log, storage))
+		r.Post("/api/drop_cart", dropCart.New(log, storage))
 		r.Post("/api/drop_cart_item", dropCartItem.New(log, storage))
 		r.Post("/api/update_cart_item", updateCartItem.New(log, storage))
-		r.Post("/api/drop_cart", dropCart.New(log, storage))
-		r.Get("/api/cart_data", cartData.New(log, storage))
-		r.Post("/api/add_cart_item", addCartItem.New(log, storage))
+		r.Post("/api/delete_item", deleteItem.New(log, storage))
 
+		r.Get("/api/articles", articles.New(log, storage))
+		r.Get("/api/article", article.New(log, storage))
+		r.Post("/api/comment", comment.New(log, storage))
+		r.Post("/api/edit_comment", editComment.New(log, storage))
+		r.Post("/api/like", like.New(log, storage))
 	})
 
 	// Public API group

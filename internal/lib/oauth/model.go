@@ -17,7 +17,7 @@ type Token struct {
 	CreationDate time.Time      `json:"date"`
 	ExpiresIn    time.Duration  `json:"expires_in"` // secs
 	Credential   string         `json:"credential"`
-	Scope        string         `json:"scope"`
+	Scope        int            `json:"scope"`
 	Claims       map[string]int `json:"claims"`
 }
 
@@ -27,5 +27,5 @@ type RefreshToken struct {
 	TokenID        string    `json:"id_token"`
 	RefreshTokenID string    `json:"id_refresh_token"`
 	Credential     string    `json:"credential"`
-	Scope          string    `json:"scope"`
+	Scope          int       `json:"scope"`
 }

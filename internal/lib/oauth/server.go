@@ -24,10 +24,10 @@ const (
 
 // CredentialsVerifier defines the interface of the user and client credentials verifier.
 type CredentialsVerifier interface {
-	// Validate username and password returning an error if the user credentials are wrong
-	ValidateUser(username, password, scope string, r *http.Request) error
+	// ValidateUser validates username and password returning an scope value and an error if the user credentials are wrong
+	ValidateUser(username, password string, r *http.Request) (int, error)
 	// Provide additional claims to the token
-	AddClaims(credential, tokenID, scope string, r *http.Request) (map[string]int, error)
+	AddClaims(credential, tokenID string, scope int, r *http.Request) (map[string]int, error)
 	// Optionally validate previously stored tokenID during refresh request
 	ValidateTokenID(credential, tokenID, refreshTokenID string) error
 	// Optionally store the tokenID generated for the user
@@ -78,12 +78,15 @@ func (bs *BearerServer) UserCredentials(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	scope := r.FormValue("scope")
-
 	refreshToken := ""
-	response, statusCode := bs.generateTokenResponse(GrantType(grantType), userData.Username, userData.Password, refreshToken, scope, "", "", r)
+	response, statusCode := bs.generateTokenResponse(GrantType(grantType), userData.Username, userData.Password, refreshToken, "", "", r)
 
 	if statusCode != 200 {
+		if statusCode == 401 {
+			w.WriteHeader(401)
+			render.JSON(w, r, resp.Alert("Имя пользователя или пароль указан неверно. Попробуйте ещё раз."))
+			return
+		}
 		w.WriteHeader(statusCode)
 		render.JSON(w, r, resp.Error(response))
 		return
@@ -105,11 +108,12 @@ func (bs *BearerServer) UserCredentials(w http.ResponseWriter, r *http.Request) 
 }
 
 // Generate token response
-func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential string, secret string, refreshToken string, scope string, code string, redirectURI string, r *http.Request) (interface{}, int) {
+func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential string, secret string, refreshToken string, code string, redirectURI string, r *http.Request) (interface{}, int) {
 	var response *TokenResponse
 	switch grantType {
 	case PasswordGrant:
-		if err := bs.verifier.ValidateUser(credential, secret, scope, r); err != nil {
+		scope, err := bs.verifier.ValidateUser(credential, secret, r)
+		if err != nil {
 			return "Not authorized: " + err.Error(), http.StatusUnauthorized
 		}
 
@@ -155,7 +159,7 @@ func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential st
 	return response, http.StatusOK
 }
 
-func (bs *BearerServer) generateTokens(username, scope string, r *http.Request) (*Token, *RefreshToken, error) {
+func (bs *BearerServer) generateTokens(username string, scope int, r *http.Request) (*Token, *RefreshToken, error) {
 	token := &Token{ID: uuid.Must(uuid.NewV4()).String(), Credential: username, ExpiresIn: bs.TokenTTL, CreationDate: time.Now().UTC(), Scope: scope}
 	if bs.verifier != nil {
 		claims, err := bs.verifier.AddClaims(username, token.ID, token.Scope, r)
