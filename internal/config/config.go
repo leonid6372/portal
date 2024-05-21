@@ -11,14 +11,16 @@ import (
 type Config struct {
 	//Env      string `yaml:"env" env-default:"local"`
 	LogLVL       string `yaml:"log_lvl" env-default:"info"`
-	SQLStorage   `yaml:"sql_storage"`
+	SQL          `yaml:"sql"`
 	HTTPServer   `yaml:"http_server"`
 	BearerServer `yaml:"bearer_server"`
 }
 
-type SQLStorage struct {
-	SQLDriver string `yaml:"sql_driver" env-required:"true"`
-	SQLInfo   string `yaml:"sql_info" env-required:"true"`
+type SQL struct {
+	PostgresDriver string `yaml:"postgres_driver" env-required:"true"`
+	MssqlDriver    string `yaml:"mssql_driver" env-required:"true"`
+	PostgresInfo   string `yaml:"postgres_info" env-required:"true"`
+	MssqlInfo      string `yaml:"mssql_info" env-required:"true"`
 }
 
 type HTTPServer struct {
@@ -30,14 +32,11 @@ type HTTPServer struct {
 type BearerServer struct {
 	SecretPath string `yaml:"secret_path" env-required:"true"`
 	Secret     string
-	TokenTTL   time.Duration `yaml:"token_ttl" end-default:"2h"`
+	TokenTTL   time.Duration `yaml:"token_ttl" end-default:2h"`
 }
 
 func MustLoad() *Config {
-	configPath := "C:/Users/Leonid/Desktop/portal/config/local.yaml"
-	if configPath == "" {
-		log.Fatal("CONFIG_PATH is not set")
-	}
+	configPath := "/home/kd02/project/portal/config/local.yaml"
 
 	// check if file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {

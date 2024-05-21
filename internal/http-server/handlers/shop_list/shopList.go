@@ -35,7 +35,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to get shop list", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get shop list: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to get shop list"))
 			return
 		}
 
@@ -53,7 +53,7 @@ func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, items 
 	if err != nil {
 		log.Error("failed to process response", sl.Err(err))
 		w.WriteHeader(500)
-		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
+		render.JSON(w, r, resp.Error("failed to process response"))
 		return
 	}
 

@@ -71,7 +71,7 @@ func (ba *BearerAuthentication) Authorize(next http.Handler) http.Handler {
 			default:
 				log.Error("server error", sl.Err(err))
 				w.WriteHeader(http.StatusInternalServerError)
-				render.JSON(w, r, resp.Error("server error: "+err.Error()))
+				render.JSON(w, r, resp.Error("server error"))
 			}
 			return
 		}
@@ -81,7 +81,7 @@ func (ba *BearerAuthentication) Authorize(next http.Handler) http.Handler {
 		if err != nil {
 			log.Error("Not authorized", sl.Err(err))
 			w.WriteHeader(http.StatusUnauthorized)
-			render.JSON(w, r, resp.Error("Not authorized: "+err.Error()))
+			render.JSON(w, r, resp.Error("Not authorized"))
 			return
 		}
 
@@ -134,4 +134,5 @@ func (ba *BearerAuthentication) checkAuthorization(auth string, w http.ResponseW
 			})
 	}
 	return token, nil
+
 }

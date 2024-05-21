@@ -2,23 +2,21 @@ package article
 
 import (
 	"encoding/json"
-	"errors"
-	"io"
 	"log/slog"
 	"net/http"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/news"
+	"strconv"
 
 	resp "portal/internal/lib/api/response"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
-	"github.com/go-playground/validator/v10"
 )
 
 type Request struct {
-	PostID int `json:"post_id" validate:"required"`
+	PostID int
 }
 
 type Article struct {
@@ -41,32 +39,23 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		)
 
 		var req Request
+		var err error
 
-		// Декодируем json запроса
-		err := render.DecodeJSON(r.Body, &req)
-		// Такую ошибку встретим, если получили запрос с пустым телом.
-		// Обработаем её отдельно
-		if errors.Is(err, io.EOF) {
-			log.Error("request body is empty")
+		// Считываем параметры запроса из request
+		r.ParseForm()
+		rawPostID, ok := r.Form["post_id"]
+		if ok {
+			req.PostID, err = strconv.Atoi(rawPostID[0])
+			if err != nil {
+				log.Error("failed to make int post id", sl.Err(err))
+				w.WriteHeader(500)
+				render.JSON(w, r, resp.Error("failed to make int post id"))
+				return
+			}
+		} else {
+			log.Error("empty post id parameter")
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("empty request"))
-			return
-		}
-		if err != nil {
-			log.Error("failed to decode request body", sl.Err(err))
-			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request: "+err.Error()))
-			return
-		}
-
-		log.Info("request body decoded", slog.Any("request", req))
-
-		// Валидация обязательных полей запроса
-		if err := validator.New().Struct(req); err != nil {
-			validateErr := err.(validator.ValidationErrors)
-			log.Error("invalid request", sl.Err(err))
-			w.WriteHeader(400)
-			render.JSON(w, r, resp.ValidationError(validateErr))
+			render.JSON(w, r, resp.Error("empty post id parameter"))
 			return
 		}
 

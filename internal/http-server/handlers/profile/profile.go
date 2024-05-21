@@ -53,7 +53,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to get profile", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get profile: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to get profile"))
 			return
 		}
 
@@ -64,7 +64,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err = json.Unmarshal([]byte(u.Data1C), &data1C); err != nil {
 			log.Error("failed to process response", sl.Err(err))
 			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to process response"))
 			return
 		}
 
@@ -80,7 +80,7 @@ func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, profil
 	if err != nil {
 		log.Error("failed to process response", sl.Err(err))
 		w.WriteHeader(500)
-		render.JSON(w, r, resp.Error("failed to process response: "+err.Error()))
+		render.JSON(w, r, resp.Error("failed to process response"))
 		return
 	}
 

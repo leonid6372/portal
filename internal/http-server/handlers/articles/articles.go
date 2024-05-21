@@ -88,9 +88,9 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Записываем все посты из БД в структуру ответа на запрос
 		var articles []Article
 		for _, post := range ps {
-			if len(post.Text) > 64 {
+			/*if len(post.Text) > 64 {
 				post.Text = post.Text[:64] // Вырезка первых 64 символов новости для превью
-			}
+			}*/
 			a := Article{Post: post}
 			articles = append(articles, a)
 		}

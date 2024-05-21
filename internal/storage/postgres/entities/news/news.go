@@ -24,7 +24,7 @@ const (
 )
 
 const (
-	postsPerPage = 2 // количество записей на странице
+	postsPerPage = 15 // количество записей на странице
 )
 
 type Post struct {
@@ -214,8 +214,12 @@ func (l *Like) GetLikesAmount(storage *postgres.Storage, postID int) (int, error
 
 	var amount int
 
+	// Запрашиваем кол-во лайков у поста в БД. Если лайки ещё не ставили или post_id нет, то вернётся 0
 	err := storage.DB.QueryRow(qrGetLikesAmountByPostID, postID).Scan(&amount)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil
+		}
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
 

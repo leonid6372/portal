@@ -8,15 +8,15 @@ import (
 	"os/signal"
 	"portal/internal/config"
 	addCartItem "portal/internal/http-server/handlers/add_cart_item"
-	article "portal/internal/http-server/handlers/article"
-	articles "portal/internal/http-server/handlers/articles"
-	comment "portal/internal/http-server/handlers/comment"
+	"portal/internal/http-server/handlers/article"
+	"portal/internal/http-server/handlers/articles"
+	cartData "portal/internal/http-server/handlers/cart_data"
+	"portal/internal/http-server/handlers/comment"
 	deleteItem "portal/internal/http-server/handlers/delete_item"
 	dropCart "portal/internal/http-server/handlers/drop_cart"
 	dropCartItem "portal/internal/http-server/handlers/drop_cart_item"
 	editComment "portal/internal/http-server/handlers/edit_comment"
-	cartData "portal/internal/http-server/handlers/get_cart_data"
-	like "portal/internal/http-server/handlers/like"
+	"portal/internal/http-server/handlers/like"
 	"portal/internal/http-server/handlers/order"
 	profile "portal/internal/http-server/handlers/profile"
 	reservationHandler "portal/internal/http-server/handlers/reservation"
@@ -30,6 +30,7 @@ import (
 	setupLogger "portal/internal/lib/logger/setup_logger"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
+	"portal/internal/storage/mssql"
 	"portal/internal/storage/postgres"
 	"syscall"
 	"time"
@@ -43,7 +44,8 @@ func main() {
 
 	log := setupLogger.New(cfg.LogLVL)
 
-	storage, err := postgres.New(cfg.SQLStorage)
+	// Подключение и закрытие базы PSQL
+	storage, err := postgres.New(cfg.SQL)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
@@ -53,10 +55,21 @@ func main() {
 		log.Info("storage closed")
 	}()
 
+	// Подключение и закрытие базы MSSQL 1C
+	storage1C, err := mssql.New(cfg.SQL)
+	if err != nil {
+		log.Error("failed to init 1C storage", sl.Err(err))
+		os.Exit(1)
+	}
+	defer func() {
+		storage1C.DB.Close()
+		log.Info("storage closed")
+	}()
+
 	bearerServer := oauth.NewBearerServer(
 		cfg.BearerServer.Secret,
 		cfg.BearerServer.TokenTTL,
-		&oauth.UserVerifier{Storage: storage, Log: log},
+		&oauth.UserVerifier{Storage: storage, Storage1C: storage1C, Log: log},
 		nil)
 
 	router := chi.NewRouter()
@@ -83,7 +96,7 @@ func main() {
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
-			log.Error("failed to start server", sl.Err(err))
+			log.Error("failed to start server")
 		}
 	}()
 
@@ -97,7 +110,7 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Error("failed to stop server", sl.Err(err))
+		log.Error("failed to stop server")
 
 		return
 	}

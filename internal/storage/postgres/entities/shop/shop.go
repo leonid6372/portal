@@ -9,7 +9,6 @@ import (
 )
 
 const (
-
 	qrNewCart                   = `INSERT INTO cart(user_id, is_active) VALUES ($1, true);`
 	qrGetItems                  = `SELECT * FROM item;`
 	qrGetInCartItems            = `SELECT in_cart_item_id, item_id, quantity FROM in_active_cart_item WHERE cart_id = $1;`
@@ -128,7 +127,6 @@ func (ici *InCartItem) GetInCartItems(storage *postgres.Storage, cartID int) ([]
 	const op = "storage.postgres.entities.shop.GetInCartItems"
 
 	qrResult, err := storage.DB.Query(qrGetInCartItems, cartID)
-
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}

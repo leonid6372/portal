@@ -1,12 +1,14 @@
 #env: "local" # Окружение - local, dev или prod
 log_lvl: "info" # Минимальный отображаемый уровень логов - info, debug, warning или error
-sql_storage:  # Данные для работы с sql-хранилещем данных
-  sql_driver: "postgres"
-  sql_info: "host=127.0.0.1 port=5432 user=postgres password=1111 dbname=portalDB sslmode=disable"
+sql:  # Данные для работы с sql-хранилещем данных
+  postgres_driver: "postgres"
+  mssql_driver: "mssql"
+  postgres_info: "host=127.0.0.1 port=5432 user=postgres password=1111 dbname=portalDB sslmode=disable"
+  mssql_info: "server=ZCKSQLQASSRV\\SQLQASSRV;user id=kdportal;password=FG9xLXVmn2!d;port=1433;encrypt=disable"
 http_server: # конфигурация нашего http-сервера
   address: "10.1.14.166:8000"
   timeout: 4s
   idle_timeout: 30s
 bearer_server:
-  secret_path: "/home/kd02/project/portal/internal/lib/oauth/secret.txt" #расположение секрета для генерации токенов
+  secret_path: "/home/kd02/project/portal/internal/lib/oauth/secret.txt" # расположение секрета для генерации токенов
   token_ttl: "2h" # время жизни access token

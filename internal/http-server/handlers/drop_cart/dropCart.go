@@ -1,4 +1,3 @@
-
 package dropCart
 
 import (
@@ -10,6 +9,7 @@ import (
 	storageHandler "portal/internal/storage"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/shop"
+
 	"log/slog"
 
 	"github.com/go-chi/chi/middleware"
@@ -23,7 +23,6 @@ type Response struct {
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.dropCart.New"
-
 
 		log := log.With(
 			slog.String("op", op),
@@ -48,21 +47,21 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			if !errors.As(err, &storageHandler.ErrCartDoesNotExist) {
 				log.Error("failed to get active cart id", sl.Err(err))
 				w.WriteHeader(422)
-				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				render.JSON(w, r, resp.Error("failed to get active cart id"))
 				return
 			}
 			// Если ошибка выше была об отсутствии корзины, то создаем корзину
 			if err := c.NewCart(storage, userID); err != nil {
 				log.Error("failed to create new cart", sl.Err(err))
 				w.WriteHeader(422)
-				render.JSON(w, r, resp.Error("failed to create cart: "+err.Error()))
+				render.JSON(w, r, resp.Error("failed to create cart"))
 				return
 			}
 			// Получаем номер созданной корзины
 			if err := c.GetActiveCartID(storage, userID); err != nil {
 				log.Error("failed to get active cart id", sl.Err(err))
 				w.WriteHeader(422)
-				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				render.JSON(w, r, resp.Error("failed to get active cart id"))
 				return
 			}
 		}
@@ -72,7 +71,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to empty cart", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to empty cart: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to empty cart"))
 			return
 		}
 

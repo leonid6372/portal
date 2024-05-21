@@ -1,4 +1,4 @@
-package update_cart_item
+package updateCartItem
 
 import (
 	"errors"
@@ -49,7 +49,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to decode request"))
 			return
 		}
 
@@ -70,7 +70,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to update item", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to update item: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to update item"))
 			return
 		}
 

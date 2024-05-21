@@ -5,31 +5,33 @@ import (
 	"log/slog"
 	"net/http"
 	"portal/internal/lib/logger/sl"
+	"portal/internal/storage/mssql"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/user"
 )
 
 // UserVerifier provides user credentials verifier for testing. Все методы этой структуры нужны для удовлетворения условиям NewBearerServer
 type UserVerifier struct {
-	Storage *postgres.Storage
-	Log     *slog.Logger
+	Storage   *postgres.Storage
+	Storage1C *mssql.Storage
+	Log       *slog.Logger
 }
 
-// ValidateUser validates username and password returning an scope value and an error if the user credentials are wrong
+// ValidateUser validates username and password returning an error if the user credentials are wrong
 func (uv *UserVerifier) ValidateUser(username, password string, r *http.Request) (int, error) {
 	const op = "lib.oauth.ValidateUser"
 	log := uv.Log.With(slog.String("op", op))
 
-	var u user.User
-	err := u.ValidateUser(uv.Storage, username, password)
+	var user user.User
+	err := user.ValidateUser(uv.Storage, uv.Storage1C, username, password)
 	if err != nil {
-		log.Error("user validation error", sl.Err(err))
+		log.Warn("user validation error", sl.Err(err))
 		return 0, errors.New("user validation error: " + err.Error())
 	}
 
 	log.Info("username " + username + " successfully validated")
 
-	return u.Role, nil
+	return user.Role, nil
 }
 
 // AddClaims provides additional claims to the token

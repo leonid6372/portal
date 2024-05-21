@@ -2,10 +2,12 @@ package user
 
 import (
 	"fmt"
+	"portal/internal/storage/mssql"
 	"portal/internal/storage/postgres"
 )
 
 const (
+	qrGetUserFullname           = `SELECT Descr FROM [10400].[dbo].[v8users] WHERE Name = $1;`
 	qrGetRole                   = `SELECT "role" FROM "user" WHERE username = $1;`
 	qrGetPassByUsername         = `SELECT "password" FROM "user" WHERE username = $1;`
 	qrGetUserIDByUsername       = `SELECT user_id FROM "user" WHERE username = $1;`
@@ -45,30 +47,40 @@ func (u *User) GetUserById(storage *postgres.Storage) error {
 	return nil
 }
 
-func (u *User) ValidateUser(storage *postgres.Storage, username, password string) error {
+func (u *User) ValidateUser(storage *postgres.Storage, storage1C *mssql.Storage, username, password string) error {
 	const op = "storage.postgres.entities.user.ValidateUser"
 
-	qrResult, err := storage.DB.Query(qrGetPassByUsername, username)
+	// Проверяем username в БД 1С
+	stmt, err := storage1C.DB.Prepare(qrGetUserFullname)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
+	defer stmt.Close()
+
+	qrResult, err := stmt.Query(username)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	// TO DO: Включить проверку на пароль
+
+	/*qrResult, err := storage.DB.Query(qrGetPassByUsername, username)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}*/
 
 	// Проверка на пустой ответ
 	if !qrResult.Next() {
 		return fmt.Errorf("%s: wrong username", op)
 	}
 
-	if err := qrResult.Scan(&u.Password); err != nil {
+	/*if err := qrResult.Scan(&u.Password); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	if password != u.Password {
 		return fmt.Errorf("%s: wrong password", op)
-	}
-
-	if err := storage.DB.QueryRow(qrGetRole, username).Scan(&u.Role); err != nil {
-		return fmt.Errorf("%s: %w", op, err)
-	}
+	}*/
 
 	return nil
 }

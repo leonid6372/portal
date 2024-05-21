@@ -1,4 +1,4 @@
-package drop_cart_item
+package dropCartItem
 
 import (
 	"errors"
@@ -48,7 +48,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to decode request"))
 			return
 		}
 
@@ -68,7 +68,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err := ici.DeleteInCartItem(storage, req.InCartItemID); err != nil {
 			log.Error("failed to delete in cart item", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to delete in cart item: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to delete in cart item"))
 			return
 		}
 

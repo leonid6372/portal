@@ -71,7 +71,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to decode request"))
 			return
 		}
 
@@ -91,7 +91,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err := i.DeleteItem(storage, req.ItemID); err != nil {
 			log.Error("failed to delete item from shop", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to delete item from shop: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to delete item from shop"))
 			return
 		}
 

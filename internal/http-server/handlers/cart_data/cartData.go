@@ -1,28 +1,30 @@
-package order
+package cartData
 
 import (
+	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
-	resp "portal/internal/lib/api/response"
-	"portal/internal/lib/logger/sl"
-	"portal/internal/lib/oauth"
 	storageHandler "portal/internal/storage"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/shop"
 
-	"log/slog"
-
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
+
+	resp "portal/internal/lib/api/response"
+	"portal/internal/lib/logger/sl"
+	"portal/internal/lib/oauth"
 )
 
 type Response struct {
 	resp.Response
+	InCartItems []shop.InCartItem `json:"cart_data"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.order.New"
+		const op = "handlers.getCartData.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -66,16 +68,33 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			}
 		}
 
-		// Переводим корзину с cartID в неактивное состояние
-		if err := c.UpdateCartToInactive(storage, c.CartID); err != nil {
-			log.Error("failed to make order", sl.Err(err))
+		// Заполняем слайс товарами для нужной корзины из БД
+		var ici *shop.InCartItem
+		icis, err := ici.GetInCartItems(storage, c.CartID)
+		if err != nil {
+			log.Error("failed to get in cart items", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to make order"))
+			render.JSON(w, r, resp.Error("failed to get in cart items"))
 			return
 		}
 
-		log.Info("order successfully made")
+		log.Info("cart data loaded")
 
-		render.JSON(w, r, resp.OK())
+		responseOK(w, r, log, icis)
 	}
+}
+
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, inCartItems []shop.InCartItem) {
+	response, err := json.Marshal(Response{
+		Response:    resp.OK(),
+		InCartItems: inCartItems,
+	})
+	if err != nil {
+		log.Error("failed to process response", sl.Err(err))
+		w.WriteHeader(500)
+		render.JSON(w, r, resp.Error("failed to process response"))
+		return
+	}
+
+	render.Data(w, r, response)
 }

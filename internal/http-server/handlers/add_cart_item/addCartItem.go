@@ -52,7 +52,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
 			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to decode request"))
 			return
 		}
 
@@ -82,7 +82,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err := i.GetIsAvailable(storage, req.ItemID); err != nil {
 			log.Error("failed to get item status", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get item status: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to get item status"))
 			return
 		}
 		if !i.IsAvailable {
@@ -100,21 +100,21 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			if !errors.As(err, &storageHandler.ErrCartDoesNotExist) {
 				log.Error("failed to get active cart id", sl.Err(err))
 				w.WriteHeader(422)
-				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				render.JSON(w, r, resp.Error("failed to get active cart id"))
 				return
 			}
 			// Если ошибка выше была об отсутствии корзины, то создаем корзину
 			if err := c.NewCart(storage, userID); err != nil {
 				log.Error("failed to create new cart", sl.Err(err))
 				w.WriteHeader(422)
-				render.JSON(w, r, resp.Error("failed to create cart: "+err.Error()))
+				render.JSON(w, r, resp.Error("failed to create cart"))
 				return
 			}
 			// Получаем номер созданной корзины
 			if err := c.GetActiveCartID(storage, userID); err != nil {
 				log.Error("failed to get active cart id", sl.Err(err))
 				w.WriteHeader(422)
-				render.JSON(w, r, resp.Error("failed to get active cart id: "+err.Error()))
+				render.JSON(w, r, resp.Error("failed to get active cart id"))
 				return
 			}
 		}
@@ -124,7 +124,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		if err := ici.NewInCartItem(storage, req.ItemID, req.Quantity, c.CartID); err != nil {
 			log.Error("failed to add item in cart", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to add item in cart: "+err.Error()))
+			render.JSON(w, r, resp.Error("failed to add item in cart"))
 			return
 		}
 
