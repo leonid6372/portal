@@ -66,7 +66,7 @@ func (ba *BearerAuthentication) Authorize(next http.Handler) http.Handler {
 			switch {
 			case errors.Is(err, http.ErrNoCookie):
 				log.Error("cookie not found")
-				w.WriteHeader(http.StatusBadRequest)
+				w.WriteHeader(http.StatusUnauthorized)
 				render.JSON(w, r, resp.Error("cookie not found"))
 			default:
 				log.Error("server error", sl.Err(err))
@@ -115,7 +115,7 @@ func (ba *BearerAuthentication) checkAuthorization(auth string, w http.ResponseW
 			return nil, fmt.Errorf("Not authorized: " + err.Error())
 		}
 		refreshToken := cookie.Value
-		response, statusCode := ba.BearerServer.generateTokenResponse(GrantType("refresh_token"), "", "", refreshToken, "", "", r)
+		response, statusCode := ba.BearerServer.generateTokenResponse(GrantType("refresh_token"), "", "", refreshToken, r)
 
 		if statusCode != 200 {
 			return nil, errors.New("Error while token generating: " + reflect.ValueOf(response).String())
@@ -123,14 +123,17 @@ func (ba *BearerAuthentication) checkAuthorization(auth string, w http.ResponseW
 
 		http.SetCookie(w,
 			&http.Cookie{
-				Name:  "access_token",
-				Value: reflect.Indirect(reflect.ValueOf(response)).FieldByName("Token").String(),
+				Name:     "access_token",
+				Value:    reflect.Indirect(reflect.ValueOf(response)).FieldByName("Token").String(),
+				HttpOnly: true,
 			})
 
 		http.SetCookie(w,
 			&http.Cookie{
-				Name:  "refresh_token",
-				Value: reflect.Indirect(reflect.ValueOf(response)).FieldByName("RefreshToken").String(),
+				Name:     "refresh_token",
+				Value:    reflect.Indirect(reflect.ValueOf(response)).FieldByName("RefreshToken").String(),
+				Expires:  time.Now().Add(2160 * time.Hour),
+				HttpOnly: true,
 			})
 	}
 	return token, nil

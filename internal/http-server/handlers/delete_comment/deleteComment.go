@@ -1,18 +1,17 @@
-package deleteItem
+package deleteComment
 
 import (
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
-	"portal/internal/storage/postgres/entities/shop"
+	"portal/internal/storage/postgres/entities/news"
 	"portal/internal/structs/roles"
 	"slices"
-
-	"log/slog"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
@@ -20,7 +19,7 @@ import (
 )
 
 type Request struct {
-	ItemID int `json:"item_id" validate:"required"`
+	CommentID int `json:"comment_id" validate:"required"`
 }
 
 type Response struct {
@@ -29,7 +28,7 @@ type Response struct {
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.deleteItem.New"
+		const op = "handlers.deleteComment.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -37,7 +36,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		)
 
 		// Определяем разрешенные роли
-		allowedRoles := []int{roles.ShopEditor, roles.SuperAdmin}
+		allowedRoles := []int{roles.NewsEditor, roles.SuperAdmin}
 
 		// Получаем user role из токена авторизации
 		role := r.Context().Value(oauth.ScopeContext).(int)
@@ -86,16 +85,16 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
-		// Удаляем предмет из БД
-		var i shop.Item
-		if err := i.DeleteItem(storage, req.ItemID); err != nil {
-			log.Error("failed to delete item from shop", sl.Err(err))
+		// Удаляем комментарий из БД
+		var c news.Comment
+		if err := c.DeleteComment(storage, req.CommentID); err != nil {
+			log.Error("failed to delete comment", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to delete item from shop"))
+			render.JSON(w, r, resp.Error("failed to delete comment"))
 			return
 		}
 
-		log.Info("item successfully deleted from shop")
+		log.Info("comment successfully deleted")
 
 		render.JSON(w, r, resp.OK())
 	}

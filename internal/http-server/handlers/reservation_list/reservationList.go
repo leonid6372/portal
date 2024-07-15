@@ -42,15 +42,8 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 		// Декодируем json запроса
 		err := render.DecodeJSON(r.Body, &req)
-		// Такую ошибку встретим, если получили запрос с пустым телом.
-		// Обработаем её отдельно
-		if errors.Is(err, io.EOF) {
-			log.Error("request body is empty")
-			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("empty request"))
-			return
-		}
-		if err != nil {
+		// Если запрос не пустой и не смог быть декодирован
+		if !errors.Is(err, io.EOF) && err != nil {
 			log.Error("failed to decode request body", sl.Err(err))
 			w.WriteHeader(400)
 			render.JSON(w, r, resp.Error("failed to decode request"))
