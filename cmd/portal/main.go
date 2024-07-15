@@ -12,10 +12,14 @@ import (
 	"portal/internal/http-server/handlers/articles"
 	cartData "portal/internal/http-server/handlers/cart_data"
 	"portal/internal/http-server/handlers/comment"
+	createPost "portal/internal/http-server/handlers/create_post"
+	deleteComment "portal/internal/http-server/handlers/delete_comment"
 	deleteItem "portal/internal/http-server/handlers/delete_item"
+	deletePost "portal/internal/http-server/handlers/delete_post"
 	dropCart "portal/internal/http-server/handlers/drop_cart"
 	dropCartItem "portal/internal/http-server/handlers/drop_cart_item"
 	editComment "portal/internal/http-server/handlers/edit_comment"
+	editPost "portal/internal/http-server/handlers/edit_post"
 	"portal/internal/http-server/handlers/like"
 	"portal/internal/http-server/handlers/order"
 	profile "portal/internal/http-server/handlers/profile"
@@ -24,6 +28,7 @@ import (
 	reservationList "portal/internal/http-server/handlers/reservation_list"
 	reservationUpdate "portal/internal/http-server/handlers/reservation_update"
 	shopList "portal/internal/http-server/handlers/shop_list"
+	"portal/internal/http-server/handlers/tag"
 	updateCartItem "portal/internal/http-server/handlers/update_cart_item"
 	userReservations "portal/internal/http-server/handlers/user_reservations"
 
@@ -63,7 +68,7 @@ func main() {
 	}
 	defer func() {
 		storage1C.DB.Close()
-		log.Info("storage closed")
+		log.Info("1C storage closed")
 	}()
 
 	bearerServer := oauth.NewBearerServer(
@@ -79,7 +84,7 @@ func main() {
 	router.Use(middleware.Recoverer) // Если где-то внутри сервера (обработчика запроса) произойдет паника, приложение не должно упасть
 	router.Use(middleware.URLFormat) // Парсер URLов поступающих запросов
 
-	routeAPI(router, log, bearerServer, cfg.BearerServer.Secret, storage)
+	routeAPI(router, log, bearerServer, cfg.BearerServer.Secret, storage, storage1C)
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 
@@ -118,7 +123,7 @@ func main() {
 	log.Info("server stopped")
 }
 
-func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServer, secret string, storage *postgres.Storage) {
+func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServer, secret string, storage *postgres.Storage, storage1C *mssql.Storage) {
 	//Secured API group
 	router.Group(func(r chi.Router) {
 		// use the Bearer Authentication middleware
@@ -129,7 +134,7 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 		r.Post("/api/reservation_update", reservationUpdate.New(log, storage))
 		r.Post("/api/reservation_drop", reservationDrop.New(log, storage))
 
-		r.Get("/api/profile", profile.New(log, storage))
+		r.Get("/api/profile", profile.New(log, storage1C))
 
 		r.Get("/api/shop_list", shopList.New(log, storage))
 		r.Post("/api/add_cart_item", addCartItem.New(log, storage))
@@ -145,6 +150,12 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 		r.Post("/api/comment", comment.New(log, storage))
 		r.Post("/api/edit_comment", editComment.New(log, storage))
 		r.Post("/api/like", like.New(log, storage))
+
+		r.Post("/api/create_article", createPost.New(log, storage))
+		r.Post("/api/edit_article", editPost.New(log, storage))
+		r.Post("/api/delete_article", deletePost.New(log, storage))
+		r.Post("/api/delete_comment", deleteComment.New(log, storage))
+		r.Post("/api/tag", tag.New(log, storage))
 	})
 
 	// Public API group

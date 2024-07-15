@@ -10,17 +10,26 @@ import (
 
 const (
 	// COALESCE() устанавливает значение update_date равное creation_date, если первое равно null, т.к. нельзя считать null в *time.Time
-	qrGetPostsPage           = `SELECT post_id, title, "text", creation_date, COALESCE(update_date, creation_date) AS update_date FROM post LIMIT $1 OFFSET $2;`
-	qrGetPostByID            = `SELECT title, "text", creation_date, COALESCE(update_date, creation_date) AS update_date FROM post WHERE post_id = $1;`
-	qrGetPostsAmount         = `SELECT count(post_id) FROM post;`
-	qrGetPostText            = `SELECT "text" FROM post WHERE post_id = $1;`
-	qrGetCommentsByPostID    = `SELECT comment_id, user_id, post_id, text, creation_date, COALESCE(update_date, creation_date) AS update_date FROM comment WHERE post_id = $1;`
-	qrUpdateCommentText      = `UPDATE comment SET "text" = $1, update_date = CURRENT_TIMESTAMP WHERE comment_id = $2;`
-	qrGetLikesAmountByPostID = `SELECT likes_amount FROM likes_amount WHERE post_id = $1;`
-	qrGetImagePathsByPostID  = `SELECT "path" FROM post_image WHERE post_id = $1;`
-	qrGetTagsByPostID        = `SELECT tag_id, "name", color FROM post_tags WHERE post_id = $1;`
-	qrNewLike                = `INSERT INTO "like"(user_id, post_id) VALUES ($1, $2);`
-	qrNewComment             = `INSERT INTO "comment"(user_id, post_id, "text", creation_date) VALUES ($1, $2, $3, CURRENT_TIMESTAMP);`
+	qrGetPostsPage            = `SELECT post_id, title, "text", creation_date, COALESCE(update_date, creation_date) AS update_date FROM post LIMIT $1 OFFSET $2;`
+	qrGetPostByID             = `SELECT title, "text", creation_date, COALESCE(update_date, creation_date) AS update_date FROM post WHERE post_id = $1;`
+	qrGetPostsAmount          = `SELECT count(post_id) FROM post;`
+	qrGetPostText             = `SELECT "text" FROM post WHERE post_id = $1;`
+	qrGetCommentsByPostID     = `SELECT comment_id, user_id, post_id, text, creation_date, COALESCE(update_date, creation_date) AS update_date FROM comment WHERE post_id = $1;`
+	qrUpdatePost              = `UPDATE post SET title = $1, "text" = $2, update_date = CURRENT_TIMESTAMP WHERE post_id = $3;`
+	qrUpdateCommentText       = `UPDATE comment SET "text" = $1, update_date = CURRENT_TIMESTAMP WHERE comment_id = $2;`
+	qrGetLikesAmountByPostID  = `SELECT likes_amount FROM likes_amount WHERE post_id = $1;`
+	qrGetImagePathsByPostID   = `SELECT "path" FROM post_image WHERE post_id = $1;`
+	qrGetTagsByPostID         = `SELECT tag_id, "name", color FROM post_tags WHERE post_id = $1;`
+	qrNewTag                  = `INSERT INTO tag("name", color) VALUES ($1, $2);`
+	qrNewLike                 = `INSERT INTO "like"(user_id, post_id) VALUES ($1, $2);`
+	qrNewComment              = `INSERT INTO "comment"(user_id, post_id, "text", creation_date) VALUES ($1, $2, $3, CURRENT_TIMESTAMP);`
+	qrNewPost                 = `INSERT INTO post(title, "text", creattion_date, update_date) VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING post_id;`
+	qrNewPostImage            = `INSERT INTO post_image(post_id, "path") VALUES ($1, $2);`
+	qrNewInPostTag            = `INSERT INTO in_post_tag(post_id, tag_id) VALUES ($1, $2);`
+	qrDeleteInPostTagByPostID = `DELETE FROM in_post_image WHERE post_id = $1;`
+	qrDeleteComment           = `DELETE FROM comment WHERE comment_id = $1;`
+	qrDeletePost              = `DELETE FROM post WHERE post_id = $1;`
+	qrDeletePostImageByPostID = `DELETE FROM post_image WHERE post_id = $1;`
 )
 
 const (
@@ -35,10 +44,44 @@ type Post struct {
 	UpdateDate   time.Time `json:"update_date,omitempty"`
 }
 
+// Also set created post id value to p.PostID
+func (p *Post) NewPost(storage *postgres.Storage, title, text string) error {
+	const op = "storage.postgres.entities.news.NewPost"
+
+	err := storage.DB.QueryRow(qrNewPost, title, text).Scan(&p.PostID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
 func (p *Post) GetText(storage *postgres.Storage, postID int) error {
 	const op = "storage.postgres.entities.news.GetText"
 
 	err := storage.DB.QueryRow(qrGetPostText, postID).Scan(&p.Text)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (p *Post) UpdatePost(storage *postgres.Storage, title, text string, postID int) error {
+	const op = "storage.postgres.entities.news.UpdatePost"
+
+	_, err := storage.DB.Exec(qrUpdatePost, title, text, postID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (p *Post) DeletePost(storage *postgres.Storage, postID int) error {
+	const op = "storage.postgres.entities.news.DeletePost"
+
+	_, err := storage.DB.Exec(qrDeletePost, postID)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -142,6 +185,17 @@ type PostImage struct {
 	Path        string `json:"path,omitempty"`
 }
 
+func (pi *PostImage) NewPostImage(storage *postgres.Storage, postID int, path string) error {
+	const op = "storage.postgres.entities.news.NewPostImage"
+
+	_, err := storage.DB.Exec(qrNewPostImage, postID, path)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
 func (pi *PostImage) GetImagePathsByPostID(storage *postgres.Storage, postID int) ([]string, error) {
 	const op = "storage.postgres.entities.news.GetImagePathsByPostID"
 
@@ -162,10 +216,32 @@ func (pi *PostImage) GetImagePathsByPostID(storage *postgres.Storage, postID int
 	return paths, nil
 }
 
+func (pi *PostImage) DeletePostImageByPostID(storage *postgres.Storage, postID int) error {
+	const op = "storage.postgres.entities.news.DeletePostImageByPostID"
+
+	_, err := storage.DB.Exec(qrDeletePostImageByPostID, postID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
 type Tag struct {
 	TagID int    `json:"tag_id,omitempty"`
 	Name  string `json:"name,omitempty"`
 	Color string `json:"color,omitempty"`
+}
+
+func (t *Tag) NewTag(storage *postgres.Storage, name, color string) error {
+	const op = "storage.postgres.entities.news.NewTag"
+
+	_, err := storage.DB.Exec(qrNewTag, name, color)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }
 
 func (t *Tag) GetTagsByPostID(storage *postgres.Storage, postID int) ([]Tag, error) {
@@ -191,6 +267,28 @@ type InPostTag struct {
 	InPostTagID int `json:"in_post_tag_id,omitempty"`
 	TagID       int `json:"tag_id,omitempty"`
 	PostID      int `json:"post_id,omitempty"`
+}
+
+func (ipt *InPostTag) NewInPostTag(storage *postgres.Storage, postID, tagID int) error {
+	const op = "storage.postgres.entities.news.NewInPostTag"
+
+	_, err := storage.DB.Exec(qrNewInPostTag, postID, tagID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (ipt *InPostTag) DeleteInPostTagByPostID(storage *postgres.Storage, postID int) error {
+	const op = "storage.postgres.entities.news.DeleteInPostTagByPostID"
+
+	_, err := storage.DB.Exec(qrDeleteInPostTagByPostID, postID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }
 
 type Like struct {
@@ -269,6 +367,17 @@ func (c *Comment) UpdateCommentText(storage *postgres.Storage, commentID int, te
 	const op = "storage.postgres.entities.news.UpdateCommentText"
 
 	_, err := storage.DB.Exec(qrUpdateCommentText, text, commentID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (c *Comment) DeleteComment(storage *postgres.Storage, commentID int) error {
+	const op = "storage.postgres.entities.news.DeleteComment"
+
+	_, err := storage.DB.Exec(qrDeleteComment, commentID)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}

@@ -56,7 +56,7 @@ CREATE TABLE reservation(
 );
 
 CREATE VIEW place_and_reservation AS (
-	SELECT reservation.place_id, place.name, place.properties, reservation.start, reservation.finish
+	SELECT reservation.place_id, place.name, reservation.start, reservation.finish
  	FROM reservation
  	JOIN place ON reservation.place_id = place.place_id
 );

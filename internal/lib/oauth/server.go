@@ -79,7 +79,7 @@ func (bs *BearerServer) UserCredentials(w http.ResponseWriter, r *http.Request) 
 	}
 
 	refreshToken := ""
-	response, statusCode := bs.generateTokenResponse(GrantType(grantType), userData.Username, userData.Password, refreshToken, "", "", r)
+	response, statusCode := bs.generateTokenResponse(GrantType(grantType), userData.Username, userData.Password, refreshToken, r)
 
 	if statusCode != 200 {
 		if statusCode == 401 {
@@ -94,21 +94,25 @@ func (bs *BearerServer) UserCredentials(w http.ResponseWriter, r *http.Request) 
 
 	http.SetCookie(w,
 		&http.Cookie{
-			Name:  "access_token",
-			Value: reflect.Indirect(reflect.ValueOf(response)).FieldByName("Token").String(),
+			Name:     "access_token",
+			Value:    reflect.Indirect(reflect.ValueOf(response)).FieldByName("Token").String(),
+			Expires:  time.Now().Add(2160 * time.Hour),
+			HttpOnly: true,
 		})
 
 	http.SetCookie(w,
 		&http.Cookie{
-			Name:  "refresh_token",
-			Value: reflect.Indirect(reflect.ValueOf(response)).FieldByName("RefreshToken").String(),
+			Name:     "role",
+			Value:    reflect.Indirect(reflect.ValueOf(response)).FieldByName("RefreshToken").String(),
+			Expires:  time.Now().Add(2160 * time.Hour),
+			HttpOnly: true,
 		})
 
 	render.JSON(w, r, resp.OK())
 }
 
 // Generate token response
-func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential string, secret string, refreshToken string, code string, redirectURI string, r *http.Request) (interface{}, int) {
+func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential string, secret string, refreshToken string, r *http.Request) (interface{}, int) {
 	var response *TokenResponse
 	switch grantType {
 	case PasswordGrant:
@@ -126,7 +130,7 @@ func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential st
 			return "Storing Token ID failed: " + err.Error(), http.StatusInternalServerError
 		}
 
-		if response, err = bs.cryptTokens(token, refresh, r); err != nil {
+		if response, err = bs.cryptTokens(token, refresh); err != nil {
 			return "Token generation failed, check security provider: " + err.Error(), http.StatusInternalServerError
 		}
 	case RefreshTokenGrant:
@@ -149,7 +153,7 @@ func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential st
 			return "Storing Token ID failed: " + err.Error(), http.StatusInternalServerError
 		}
 
-		if response, err = bs.cryptTokens(token, refresh, r); err != nil {
+		if response, err = bs.cryptTokens(token, refresh); err != nil {
 			return "Token generation failed: " + err.Error(), http.StatusInternalServerError
 		}
 	default:
@@ -174,7 +178,7 @@ func (bs *BearerServer) generateTokens(username string, scope int, r *http.Reque
 	return token, refreshToken, nil
 }
 
-func (bs *BearerServer) cryptTokens(token *Token, refresh *RefreshToken, r *http.Request) (*TokenResponse, error) {
+func (bs *BearerServer) cryptTokens(token *Token, refresh *RefreshToken) (*TokenResponse, error) {
 	cToken, err := bs.provider.CryptToken(token)
 	if err != nil {
 		return nil, err

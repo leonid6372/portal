@@ -18,6 +18,7 @@ const (
 						  (SELECT DISTINCT place_id, "name", properties, false AS is_available FROM place_and_reservation
 						  WHERE ($1, $2) OVERLAPS ("start", finish));`
 	qrGetReservationsByUserID = `SELECT reservation_id, place_id, start, finish FROM reservation WHERE user_id = $1;`
+	qrGetIsPlaceAvailable     = `SELECT reservation_id FROM reservation WHERE place_id = $1 AND (start, finish) OVERLAPS ($2, $3);`
 	qrInsertReservation       = `INSERT INTO reservation (place_id, start, finish, user_id) VALUES ($1, $3, $4, $2);`
 	qrUpdateReservation       = `UPDATE reservation SET place_id = $2, start = $3, finish = $4 WHERE reservation_id = $1;`
 	qrDeleteReservation       = `DELETE FROM reservation WHERE reservation_id = $1;`
@@ -66,7 +67,17 @@ type Reservation struct {
 func (r *Reservation) InsertReservation(storage *postgres.Storage, placeID, userID int, start, finish string) error {
 	const op = "storage.postgres.entities.reservation.InsertReservation" // Имя текущей функции для логов и ошибок
 
-	_, err := storage.DB.Exec(qrInsertReservation, placeID, userID, start, finish)
+	qrResult, err := storage.DB.Query(qrGetIsPlaceAvailable, placeID, start, finish)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	// Проверка на пустой ответ
+	if qrResult.Next() {
+		return fmt.Errorf("%s: place is already taken", op)
+	}
+
+	_, err = storage.DB.Exec(qrInsertReservation, placeID, userID, start, finish)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -96,23 +107,22 @@ func (r *Reservation) DeleteReservation(storage *postgres.Storage, reservationID
 	return nil
 }
 
-type Reservations []Reservation // <- <- <- !Переделать! <- <- <-
-
-func (rs *Reservations) GetReservationsByUserID(storage *postgres.Storage, userID int) error {
+func (r *Reservation) GetReservationsByUserID(storage *postgres.Storage, userID int) ([]Reservation, error) {
 	const op = "storage.postgres.entities.reservation.GetReservationsByUserID" // Имя текущей функции для логов и ошибок
 
 	qrResult, err := storage.DB.Query(qrGetReservationsByUserID, userID)
 	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
+	var rs []Reservation
 	for qrResult.Next() {
-		r := Reservation{UserID: userID}
+		var r Reservation
 		if err := qrResult.Scan(&r.ReservationID, &r.PlaceID, &r.Start, &r.Finish); err != nil {
-			return fmt.Errorf("%s: %w", op, err)
+			return nil, fmt.Errorf("%s: %w", op, err)
 		}
-		*rs = append(*rs, r)
+		rs = append(rs, r)
 	}
 
-	return nil
+	return rs, nil
 }

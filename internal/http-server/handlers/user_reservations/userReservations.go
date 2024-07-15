@@ -16,7 +16,7 @@ import (
 
 type Response struct {
 	resp.Response
-	Reservations reservation.Reservations `json:"user_reservations"`
+	Reservations []reservation.Reservation `json:"user_reservations"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
@@ -38,8 +38,10 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
-		var reservations reservation.Reservations
-		if err := reservations.GetReservationsByUserID(storage, userID); err != nil {
+		var reserv reservation.Reservation
+		var reservations []reservation.Reservation
+		reservations, err := reserv.GetReservationsByUserID(storage, userID)
+		if err != nil {
 			log.Error("failed to get reservation list", sl.Err(err))
 			w.WriteHeader(422)
 			render.JSON(w, r, resp.Error("failed to get reservation list"))
@@ -52,7 +54,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, reservations reservation.Reservations) {
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, reservations []reservation.Reservation) {
 	response, err := json.Marshal(Response{
 		Response:     resp.OK(),
 		Reservations: reservations,

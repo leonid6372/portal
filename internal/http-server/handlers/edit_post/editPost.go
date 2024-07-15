@@ -1,18 +1,18 @@
-package deleteItem
+package editPost
 
 import (
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
-	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
-	"portal/internal/storage/postgres/entities/shop"
+	"portal/internal/storage/postgres/entities/news"
 	"portal/internal/structs/roles"
 	"slices"
 
-	"log/slog"
+	resp "portal/internal/lib/api/response"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
@@ -20,7 +20,11 @@ import (
 )
 
 type Request struct {
-	ItemID int `json:"item_id" validate:"required"`
+	PostID int      `json:"post_id" validate:"required"`
+	Title  string   `json:"item_id" validate:"required"`
+	Text   string   `json:"quantity" validate:"required"`
+	Images []string `json:"images" validate:"required"`
+	Tags   []int    `json:"tags" validate:"required"`
 }
 
 type Response struct {
@@ -29,7 +33,7 @@ type Response struct {
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.deleteItem.New"
+		const op = "handlers.createArticle.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -37,7 +41,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		)
 
 		// Определяем разрешенные роли
-		allowedRoles := []int{roles.ShopEditor, roles.SuperAdmin}
+		allowedRoles := []int{roles.NewsEditor, roles.SuperAdmin}
 
 		// Получаем user role из токена авторизации
 		role := r.Context().Value(oauth.ScopeContext).(int)
@@ -86,16 +90,54 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
-		// Удаляем предмет из БД
-		var i shop.Item
-		if err := i.DeleteItem(storage, req.ItemID); err != nil {
-			log.Error("failed to delete item from shop", sl.Err(err))
+		// Удаляем URL изображений поста из БД
+		var pi news.PostImage
+		if err := pi.DeletePostImageByPostID(storage, req.PostID); err != nil {
+			log.Error("failed to delete post images", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to delete item from shop"))
+			render.JSON(w, r, resp.Error("failed to delete post images"))
 			return
 		}
 
-		log.Info("item successfully deleted from shop")
+		// Удаляем тэги к посту
+		var ipt news.InPostTag
+		if err := ipt.DeleteInPostTagByPostID(storage, req.PostID); err != nil {
+			log.Error("failed to delete post tags", sl.Err(err))
+			w.WriteHeader(422)
+			render.JSON(w, r, resp.Error("failed to delete post tags"))
+			return
+		}
+
+		// Обновляем пост в БД
+		var p news.Post
+		if err := p.UpdatePost(storage, req.Title, req.Text, req.PostID); err != nil {
+			log.Error("failed to update post", sl.Err(err))
+			w.WriteHeader(422)
+			render.JSON(w, r, resp.Error("failed to update post"))
+			return
+		}
+
+		// Добавляем новые URL изображений к посту
+		for _, image := range req.Images {
+			if err := pi.NewPostImage(storage, p.PostID, image); err != nil {
+				log.Error("failed to add image to post", sl.Err(err))
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to add image to post"))
+				return
+			}
+		}
+
+		// Добавляем новые тэги к посту
+		for _, tag := range req.Tags {
+			if err := ipt.NewInPostTag(storage, p.PostID, tag); err != nil {
+				log.Error("failed to add tag to post", sl.Err(err))
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to add tag to post"))
+				return
+			}
+		}
+
+		log.Info("article successfully created")
 
 		render.JSON(w, r, resp.OK())
 	}
