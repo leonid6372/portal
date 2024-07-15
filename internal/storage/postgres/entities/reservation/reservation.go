@@ -10,12 +10,12 @@ import (
 
 const (
 	// Получение актуальных мест 1. делаем все места "доступно" и вычитаем занятые 2. прибавляем занятые с пометкой "недостпуно"
-	qrGetActualPlaces = `(SELECT *, true AS is_available FROM place
+	qrGetActualPlaces = `(SELECT place_id, "name", true AS is_available FROM place
 						  EXCEPT
-						  SELECT DISTINCT place_id, "name", properties, true AS is_available FROM place_and_reservation
+						  SELECT DISTINCT place_id, "name", true AS is_available FROM place_and_reservation
 						  WHERE ($1, $2) OVERLAPS ("start", finish))
 						  UNION
-						  (SELECT DISTINCT place_id, "name", properties, false AS is_available FROM place_and_reservation
+						  (SELECT DISTINCT place_id, "name", false AS is_available FROM place_and_reservation
 						  WHERE ($1, $2) OVERLAPS ("start", finish));`
 	qrGetReservationsByUserID = `SELECT reservation_id, place_id, start, finish FROM reservation WHERE user_id = $1;`
 	qrGetIsPlaceAvailable     = `SELECT reservation_id FROM reservation WHERE place_id = $1 AND (start, finish) OVERLAPS ($2, $3);`
@@ -47,7 +47,7 @@ func (ap *ActualPlace) GetActualPlaces(storage *postgres.Storage, properties str
 
 	for qrResult.Next() {
 		var ap ActualPlace
-		if err := qrResult.Scan(&ap.PlaceID, &ap.Name, &ap.Properties, &ap.IsAvailable); err != nil {
+		if err := qrResult.Scan(&ap.PlaceID, &ap.Name, &ap.IsAvailable); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 		aps = append(aps, ap)
