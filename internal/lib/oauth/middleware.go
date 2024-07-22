@@ -84,7 +84,7 @@ func (ba *BearerAuthentication) Authorize(next http.Handler) http.Handler {
 			render.JSON(w, r, resp.Error("Not authorized"))
 			return
 		}
-
+		fmt.Println(token.Claims)
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, CredentialContext, token.Credential)
 		ctx = context.WithValue(ctx, ClaimsContext, token.Claims)
@@ -103,6 +103,7 @@ func (ba *BearerAuthentication) checkAuthorization(auth string, w http.ResponseW
 	if err != nil {
 		return nil, errors.New("Invalid token: " + err.Error())
 	}
+
 	if time.Now().UTC().After(token.CreationDate.Add(token.ExpiresIn)) {
 		cookie, err := r.Cookie("refresh_token")
 		if err != nil {
@@ -125,6 +126,7 @@ func (ba *BearerAuthentication) checkAuthorization(auth string, w http.ResponseW
 			&http.Cookie{
 				Name:     "access_token",
 				Value:    reflect.Indirect(reflect.ValueOf(response)).FieldByName("Token").String(),
+				Expires:  time.Now().Add(2160 * time.Hour), // Время зачитски куки из браузера (ttl находитися в token.ExpiresIn)
 				HttpOnly: true,
 			})
 

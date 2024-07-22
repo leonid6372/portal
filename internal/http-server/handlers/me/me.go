@@ -1,4 +1,4 @@
-package userReservations
+package me
 
 import (
 	"encoding/json"
@@ -6,23 +6,27 @@ import (
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
-	"portal/internal/storage/postgres"
-	"portal/internal/storage/postgres/entities/reservation"
-
 	"portal/internal/lib/oauth"
+	"portal/internal/storage/postgres"
+	"portal/internal/storage/postgres/entities/user"
 
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
 )
 
+type User struct {
+	UserID   int    `json:"user_id"`
+	Username string `json:"username"`
+}
+
 type Response struct {
 	resp.Response
-	Reservations []reservation.Reservation `json:"user_reservations"`
+	User User `json:"user"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.userReservations.New"
+		const op = "handlers.me.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -39,26 +43,26 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
-		var reserv reservation.Reservation
-		var reservations []reservation.Reservation
-		reservations, err := reserv.GetReservationsByUserID(storage, userID)
+		// Получаем username из БД
+		var u user.User
+		err := u.GetUsername(storage, userID)
 		if err != nil {
-			log.Error("failed to get reservation list", sl.Err(err))
+			log.Error("failed to get username", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get reservation list"))
+			render.JSON(w, r, resp.Error("failed to get username"))
 			return
 		}
 
-		log.Info("user reservations gotten")
+		user := User{UserID: userID, Username: u.Username}
 
-		responseOK(w, r, log, reservations)
+		responseOK(w, r, log, user)
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, reservations []reservation.Reservation) {
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, user User) {
 	response, err := json.Marshal(Response{
-		Response:     resp.OK(),
-		Reservations: reservations,
+		Response: resp.OK(),
+		User:     user,
 	})
 	if err != nil {
 		log.Error("failed to process response", sl.Err(err))
