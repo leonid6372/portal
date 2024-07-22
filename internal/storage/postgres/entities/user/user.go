@@ -2,11 +2,13 @@ package user
 
 import (
 	"fmt"
+	storageHandler "portal/internal/storage"
 	"portal/internal/storage/mssql"
 	"portal/internal/storage/postgres"
 )
 
 const (
+	qrNewUser                   = `INSERT INTO "user" (role, balance, username) VALUES (50, 0, $1) RETURNING user_id;`
 	qrGetUserFullname           = `SELECT _Fld7254 FROM [10295].[dbo].[_InfoRg7251] WHERE _Fld7252 = $1;`
 	qrGetRole                   = `SELECT "role" FROM "user" WHERE username = $1;`
 	qrGetPassByUsername         = `SELECT "password" FROM "user" WHERE username = $1;`
@@ -26,6 +28,17 @@ type User struct {
 	Balance  int    `json:"balance,omitempty"`
 	Password string `json:"password,omitempty"`
 	Role     int    `json:"role,omitempty"`
+}
+
+func (u *User) NewUser(storage *postgres.Storage, username string) error {
+	const op = "storage.postgres.entities.user.NewUser"
+
+	err := storage.DB.QueryRow(qrNewUser, username).Scan(&u.UserID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }
 
 func (u *User) GetUserById(storage *postgres.Storage) error {
@@ -96,7 +109,7 @@ func (u *User) GetUserID(storage *postgres.Storage, username string) error {
 
 	// Проверка на пустой ответ
 	if !qrResult.Next() {
-		return fmt.Errorf("%s: wrong username", op)
+		return fmt.Errorf("%s: %w", op, op, storageHandler.ErrUserIDDoesNotExist)
 	}
 
 	if err := qrResult.Scan(&u.UserID); err != nil {

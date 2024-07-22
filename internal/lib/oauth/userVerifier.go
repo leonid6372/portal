@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"portal/internal/lib/logger/sl"
+	storageHandler "portal/internal/storage"
 	"portal/internal/storage/mssql"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/user"
@@ -41,11 +42,20 @@ func (uv *UserVerifier) AddClaims(credential, tokenID string, scope int, r *http
 
 	claims := make(map[string]int, 1) // 1 - количество параметров claims в токене
 
+	// Get user id
 	var u user.User
-	err := u.GetUserID(uv.Storage, credential) // credential contains username
+	err := u.GetUserID(uv.Storage, credential)
 	if err != nil {
-		log.Error("token claims error", sl.Err(err))
-		return claims, errors.New("token claims error: " + err.Error())
+		// Если ошибка не об отсутствии user_id, то выход по стнадартной ошибке БД
+		if !errors.As(err, &storageHandler.ErrUserIDDoesNotExist) {
+			log.Error(op, "failed to get user id", sl.Err(err))
+			return claims, errors.New("token claims error: " + err.Error())
+		}
+		// Если ошибка выше была об отсутствии user_id, то создаем user_id для пользователя и получаем его в u.UserID
+		if err := u.NewUser(uv.Storage, credential); err != nil {
+			log.Error(op, "failed to create user in postgres", sl.Err(err))
+			return claims, errors.New("token claims error: " + err.Error())
+		}
 	}
 
 	claims["user_id"] = u.UserID
@@ -79,7 +89,7 @@ func (uv *UserVerifier) StoreTokenID(credential, tokenID, refreshTokenID string)
 	var refreshToken *user.RefreshToken
 	err := refreshToken.StoreRefreshTokenID(uv.Storage, credential, refreshTokenID) // credential contains username
 	if err != nil {
-		log.Error("token ID storing error", sl.Err(err))
+		log.Error(op, "token ID storing error", sl.Err(err))
 		return errors.New("token ID storing error: " + err.Error())
 	}
 

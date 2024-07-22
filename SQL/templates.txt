@@ -1,6 +1,7 @@
 CREATE TABLE "user"(
 	user_id SERIAL PRIMARY KEY,
-	"1c" JSONB, balance INT,
+	"1c" JSONB,
+	balance INT,
 	"role" INT NOT NULL,
 	"password" varchar(50),
 	username varchar(50)
