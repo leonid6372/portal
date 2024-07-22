@@ -7,11 +7,12 @@ import (
 )
 
 const (
-	qrGetUserFullname           = `SELECT Descr FROM [10400].[dbo].[v8users] WHERE Name = $1;`
+	qrGetUserFullname           = `SELECT _Fld7254 FROM [10295].[dbo].[_InfoRg7251] WHERE _Fld7252 = $1;`
 	qrGetRole                   = `SELECT "role" FROM "user" WHERE username = $1;`
 	qrGetPassByUsername         = `SELECT "password" FROM "user" WHERE username = $1;`
 	qrGetUserIDByUsername       = `SELECT user_id FROM "user" WHERE username = $1;`
 	qrGetUserById               = `SELECT "1c" FROM "user" WHERE user_id = $1;`
+	qrGetUsernameByUserID       = `SELECT username FROM "user" WHERE user_id = $1;`
 	qrGetRefreshTokenIDByUserID = `SELECT refresh_token_id FROM refresh_token WHERE user_id = $1;`
 	qrStoreRefreshTokenID       = `INSERT INTO refresh_token (user_id, refresh_token_id)
 								   VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE
@@ -99,6 +100,17 @@ func (u *User) GetUserID(storage *postgres.Storage, username string) error {
 	}
 
 	if err := qrResult.Scan(&u.UserID); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (u *User) GetUsername(storage *postgres.Storage, userID int) error {
+	const op = "storage.postgres.entities.user.GetUsername"
+
+	err := storage.DB.QueryRow(qrGetUsernameByUserID, userID).Scan(&u.Username)
+	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 

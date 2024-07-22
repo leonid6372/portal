@@ -21,6 +21,7 @@ import (
 	editComment "portal/internal/http-server/handlers/edit_comment"
 	editPost "portal/internal/http-server/handlers/edit_post"
 	"portal/internal/http-server/handlers/like"
+	"portal/internal/http-server/handlers/me"
 	"portal/internal/http-server/handlers/order"
 	profile "portal/internal/http-server/handlers/profile"
 	reservationHandler "portal/internal/http-server/handlers/reservation"
@@ -134,7 +135,8 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 		r.Post("/api/reservation_update", reservationUpdate.New(log, storage))
 		r.Post("/api/reservation_drop", reservationDrop.New(log, storage))
 
-		r.Get("/api/profile", profile.New(log, storage1C))
+		r.Get("/api/profile", profile.New(log, storage, storage1C))
+		r.Get("/api/me", me.New(log, storage))
 
 		r.Get("/api/shop_list", shopList.New(log, storage))
 		r.Post("/api/add_cart_item", addCartItem.New(log, storage))

@@ -2,29 +2,26 @@ package profile
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
+	"portal/internal/storage/postgres"
+	"portal/internal/storage/postgres/entities/user"
+	"strconv"
 
 	"log/slog"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
-	"github.com/go-playground/validator/v10"
 
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
+	"portal/internal/lib/oauth"
 	"portal/internal/storage/mssql"
 )
 
 const (
 	qrGetUserByUsername = `SELECT _Fld7252, _Fld7254, _Fld7255, _Fld7256, _Fld7257 FROM [10295].[dbo].[_InfoRg7251] WHERE _Fld7252 = $1;`
 )
-
-type Request struct {
-	Username string `json:"username" validate:"required"`
-}
 
 // Временная вспомогательная структура
 type Profile struct {
@@ -40,7 +37,7 @@ type Response struct {
 	Profile Profile `json:"profile"`
 }
 
-func New(log *slog.Logger, storage1C *mssql.Storage) http.HandlerFunc {
+func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.profile.New"
 
@@ -49,38 +46,45 @@ func New(log *slog.Logger, storage1C *mssql.Storage) http.HandlerFunc {
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		var req Request
+		var err error
 
-		// Декодируем json запроса
-		err := render.DecodeJSON(r.Body, &req)
-		// Такую ошибку встретим, если получили запрос с пустым телом.
-		// Обработаем её отдельно
-		if errors.Is(err, io.EOF) {
-			log.Error("request body is empty")
-			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("empty request"))
-			return
+		var userID int
+
+		// Считываем параметры запроса из request
+		r.ParseForm()
+		rawUserID, ok := r.Form["user_id"]
+		if ok {
+			userID, err = strconv.Atoi(rawUserID[0])
+			if err != nil {
+				log.Error("failed to make int user id", sl.Err(err))
+				w.WriteHeader(500)
+				render.JSON(w, r, resp.Error("failed to make int user id"))
+				return
+			}
+		} else {
+			// Получаем userID из токена авторизации, если не указан в параметре
+			tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]int)
+			userID, ok = tempUserID["user_id"]
+			if !ok {
+				log.Error("no user id in token claims")
+				w.WriteHeader(500)
+				render.JSON(w, r, resp.Error("no user id in token claims"))
+				return
+			}
 		}
+
+		// Получаем username из БД
+		var u user.User
+		err = u.GetUsername(storage, userID)
 		if err != nil {
-			log.Error("failed to decode request body", sl.Err(err))
-			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request"))
-			return
-		}
-
-		log.Info("request body decoded", slog.Any("request", req))
-
-		// Валидация обязательных полей запроса
-		if err := validator.New().Struct(req); err != nil {
-			validateErr := err.(validator.ValidationErrors)
-			log.Error("invalid request", sl.Err(err))
-			w.WriteHeader(400)
-			render.JSON(w, r, resp.ValidationError(validateErr))
+			log.Error("failed to get username", sl.Err(err))
+			w.WriteHeader(422)
+			render.JSON(w, r, resp.Error("failed to get username"))
 			return
 		}
 
 		// Получаем данные пользователя по username из БД MSSQL
-		p := Profile{Fld7252: req.Username}
+		p := Profile{Fld7252: u.Username}
 		err = p.GetUserByUsername(storage1C)
 		if err != nil {
 			log.Error("failed to get profile", sl.Err(err))

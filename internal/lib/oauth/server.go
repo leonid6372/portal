@@ -96,13 +96,13 @@ func (bs *BearerServer) UserCredentials(w http.ResponseWriter, r *http.Request) 
 		&http.Cookie{
 			Name:     "access_token",
 			Value:    reflect.Indirect(reflect.ValueOf(response)).FieldByName("Token").String(),
-			Expires:  time.Now().Add(2160 * time.Hour),
+			Expires:  time.Now().Add(2160 * time.Hour), // Время зачитски куки из браузера (ttl находитися в bs.TokenTTL)
 			HttpOnly: true,
 		})
 
 	http.SetCookie(w,
 		&http.Cookie{
-			Name:     "role",
+			Name:     "refresh_token",
 			Value:    reflect.Indirect(reflect.ValueOf(response)).FieldByName("RefreshToken").String(),
 			Expires:  time.Now().Add(2160 * time.Hour),
 			HttpOnly: true,

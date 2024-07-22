@@ -16,7 +16,8 @@ const (
 						  WHERE ($1, $2) OVERLAPS ("start", finish))
 						  UNION
 						  (SELECT DISTINCT place_id, "name", false AS is_available FROM place_and_reservation
-						  WHERE ($1, $2) OVERLAPS ("start", finish));`
+						  WHERE ($1, $2) OVERLAPS ("start", finish))
+						  ORDER BY place_id;`
 	qrGetReservationsByUserID = `SELECT reservation_id, place_id, start, finish FROM reservation WHERE user_id = $1;`
 	qrGetIsPlaceAvailable     = `SELECT reservation_id FROM reservation WHERE place_id = $1 AND (start, finish) OVERLAPS ($2, $3);`
 	qrInsertReservation       = `INSERT INTO reservation (place_id, start, finish, user_id) VALUES ($1, $3, $4, $2);`

@@ -131,7 +131,7 @@ func (ici *InCartItem) GetInCartItems(storage *postgres.Storage, cartID int) ([]
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	var icis []InCartItem
+	icis := []InCartItem{}
 
 	for qrResult.Next() {
 		var ici InCartItem

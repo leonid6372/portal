@@ -6,7 +6,7 @@ sql:  # Данные для работы с sql-хранилещем данны�
   postgres_info: "host=127.0.0.1 port=5432 user=postgres password=1111 dbname=portalDB sslmode=disable"
   mssql_info: "server=ZCKSQLQASSRV\\SQLQASSRV;user id=kdportal;password=FG9xLXVmn2!d;port=1433;encrypt=disable"
 http_server: # конфигурация нашего http-сервера
-  address: "10.1.14.166:8000"
+  address: "10.1.14.166:8005"
   timeout: 4s
   idle_timeout: 30s
 bearer_server:
