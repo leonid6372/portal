@@ -4,7 +4,7 @@ CREATE TABLE "user"(
 	balance INT,
 	"role" INT NOT NULL,
 	"password" varchar(50),
-	username varchar(50)
+	username varchar(50) UNIQUE
 );
 
 CREATE TABLE item(

@@ -147,11 +147,10 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 		r.Post("/api/update_cart_item", updateCartItem.New(log, storage))
 		r.Post("/api/delete_item", deleteItem.New(log, storage))
 
-		r.Get("/api/articles", articles.New(log, storage))
-		r.Get("/api/article", article.New(log, storage))
 		r.Post("/api/comment", comment.New(log, storage))
 		r.Post("/api/edit_comment", editComment.New(log, storage))
 		r.Post("/api/like", like.New(log, storage))
+		//r.Get("/api/tags", tags.New(log, storage))
 
 		r.Post("/api/create_article", createPost.New(log, storage))
 		r.Post("/api/edit_article", editPost.New(log, storage))
@@ -163,5 +162,8 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 	// Public API group
 	router.Group(func(r chi.Router) {
 		r.Post("/api/login", bearerServer.UserCredentials)
+
+		r.Get("/api/articles", articles.New(log, storage))
+		r.Get("/api/article", article.New(log, storage))
 	})
 }
