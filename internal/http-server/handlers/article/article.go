@@ -20,13 +20,13 @@ type Request struct {
 }
 
 type Article struct {
-	Text     string
-	Comments []news.Comment
+	Text     string         `json:"text"`
+	Comments []news.Comment `json:"comments"`
 }
 
 type Response struct {
 	resp.Response
-	Article Article
+	Article Article `json:"article"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
