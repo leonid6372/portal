@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"reflect"
+	"strconv"
 	"time"
 
 	resp "portal/internal/lib/api/response"
@@ -84,7 +85,7 @@ func (ba *BearerAuthentication) Authorize(next http.Handler) http.Handler {
 			render.JSON(w, r, resp.Error("Not authorized"))
 			return
 		}
-
+		fmt.Println(token.Scope)
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, CredentialContext, token.Credential)
 		ctx = context.WithValue(ctx, ClaimsContext, token.Claims)
@@ -116,7 +117,7 @@ func (ba *BearerAuthentication) checkAuthorization(auth string, w http.ResponseW
 			return nil, fmt.Errorf("Not authorized: " + err.Error())
 		}
 		refreshToken := cookie.Value
-		response, statusCode := ba.BearerServer.generateTokenResponse(GrantType("refresh_token"), "", "", refreshToken, r)
+		response, role, statusCode := ba.BearerServer.generateTokenResponse(GrantType("refresh_token"), "", "", refreshToken, r)
 
 		if statusCode != 200 {
 			return nil, errors.New("Error while token generating: " + reflect.ValueOf(response).String())
@@ -134,6 +135,14 @@ func (ba *BearerAuthentication) checkAuthorization(auth string, w http.ResponseW
 			&http.Cookie{
 				Name:     "refresh_token",
 				Value:    reflect.Indirect(reflect.ValueOf(response)).FieldByName("RefreshToken").String(),
+				Expires:  time.Now().Add(2160 * time.Hour),
+				HttpOnly: true,
+			})
+
+		http.SetCookie(w,
+			&http.Cookie{
+				Name:     "role",
+				Value:    strconv.Itoa(role),
 				Expires:  time.Now().Add(2160 * time.Hour),
 				HttpOnly: true,
 			})

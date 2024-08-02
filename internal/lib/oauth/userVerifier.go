@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"portal/internal/lib/logger/sl"
@@ -23,16 +24,37 @@ func (uv *UserVerifier) ValidateUser(username, password string, r *http.Request)
 	const op = "lib.oauth.ValidateUser"
 	log := uv.Log.With(slog.String("op", op))
 
-	var user user.User
-	err := user.ValidateUser(uv.Storage, uv.Storage1C, username, password)
+	var u user.User
+	err := u.ValidateUser(uv.Storage, uv.Storage1C, username, password)
 	if err != nil {
 		log.Warn("user validation error", sl.Err(err))
 		return 0, errors.New("user validation error: " + err.Error())
 	}
 
-	log.Info("username " + username + " successfully validated")
+	// Get user id
+	err = u.GetUserID(uv.Storage, username)
+	if err != nil {
+		// Если ошибка не об отсутствии user_id, то выход по стнадартной ошибке БД
+		if !errors.As(err, &storageHandler.ErrUserIDDoesNotExist) {
+			log.Error(op, "failed to get user id", sl.Err(err))
+			return 0, errors.New("token claims error: " + err.Error())
+		}
+		// Если ошибка выше была об отсутствии user_id, то создаем user_id для пользователя и получаем его в u.UserID
+		if err := u.NewUser(uv.Storage, username); err != nil {
+			log.Error(op, "failed to create user in postgres", sl.Err(err))
+			return 0, errors.New("token claims error: " + err.Error())
+		}
+	}
 
-	return user.Role, nil
+	err = u.GetRoleByUsername(uv.Storage, username)
+	if err != nil {
+		log.Warn("failed to get user role", sl.Err(err))
+		return 0, errors.New("failed to get user role: " + err.Error())
+	}
+
+	log.Info("username " + username + " successfully validated")
+	fmt.Println(u.Role)
+	return u.Role, nil
 }
 
 // AddClaims provides additional claims to the token

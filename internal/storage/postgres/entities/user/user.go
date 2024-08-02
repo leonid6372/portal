@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	qrNewUser                   = `INSERT INTO "user" (role, balance, username) VALUES (50, 0, $1) RETURNING user_id;`
+	qrNewUser                   = `INSERT INTO "user" (role, balance, username) VALUES (50, 0, $1) RETURNING user_id, role;`
 	qrGetUserFullname           = `SELECT _Fld7254 FROM [10295].[dbo].[_InfoRg7251] WHERE _Fld7252 = $1;`
 	qrGetRole                   = `SELECT "role" FROM "user" WHERE username = $1;`
 	qrGetPassByUsername         = `SELECT "password" FROM "user" WHERE username = $1;`
@@ -33,7 +33,7 @@ type User struct {
 func (u *User) NewUser(storage *postgres.Storage, username string) error {
 	const op = "storage.postgres.entities.user.NewUser"
 
-	err := storage.DB.QueryRow(qrNewUser, username).Scan(&u.UserID)
+	err := storage.DB.QueryRow(qrNewUser, username).Scan(&u.UserID, &u.Role)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -123,6 +123,17 @@ func (u *User) GetUsername(storage *postgres.Storage, userID int) error {
 	const op = "storage.postgres.entities.user.GetUsername"
 
 	err := storage.DB.QueryRow(qrGetUsernameByUserID, userID).Scan(&u.Username)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (u *User) GetRoleByUsername(storage *postgres.Storage, username string) error {
+	const op = "storage.postgres.entities.user.GetRoleByUsername"
+
+	err := storage.DB.QueryRow(qrGetRole, username).Scan(&u.Role)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}

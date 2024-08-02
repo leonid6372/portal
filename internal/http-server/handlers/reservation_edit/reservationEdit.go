@@ -1,4 +1,4 @@
-package reservationDrop
+package reservationEdit
 
 import (
 	"errors"
@@ -7,16 +7,23 @@ import (
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
+	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/reservation"
+	"portal/internal/structs/roles"
+	"slices"
+	"time"
 
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 )
 
 type Request struct {
-	ReservationID int `json:"reservation_id" validate:"required"`
+	ReservationID int       `json:"reservation_id" validate:"required"`
+	PlaceID       int       `json:"place_id" validate:"required"`
+	Start         time.Time `json:"start" validate:"required"`
+	Finish        time.Time `json:"finish" validate:"required"`
 }
 
 type Response struct {
@@ -25,12 +32,32 @@ type Response struct {
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.reservationDrop.New"
+		const op = "handlers.reservationEdit.New"
 
 		log := log.With(
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
+
+		// Определяем разрешенные роли
+		allowedRoles := []int{roles.ReservationEditor, roles.SuperAdmin}
+
+		// Получаем user role из токена авторизации
+		role := r.Context().Value(oauth.ScopeContext).(int)
+		if role == 0 {
+			log.Error("no user role in token")
+			w.WriteHeader(500)
+			render.JSON(w, r, resp.Error("no user role in token"))
+			return
+		}
+
+		//  Проверяем доступно ли действие для роли текущего пользователя
+		if !slices.Contains(allowedRoles, role) {
+			log.Error("access was denied")
+			w.WriteHeader(403)
+			render.JSON(w, r, resp.Error("access was denied"))
+			return
+		}
 
 		var req Request
 
@@ -62,18 +89,17 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
-		// TO DO: нужна ли проверка на удаление собственное продирование удаляется
-		// Удаление записи брониварония из БД
+		// Добавление записи бронирования в БД
 		var reservation *reservation.Reservation
-		err = reservation.DeleteReservation(storage, req.ReservationID)
+		err = reservation.UpdateReservation(storage, req.ReservationID, req.PlaceID, req.Start, req.Finish)
 		if err != nil {
-			log.Error("failed to drop reservation", sl.Err(err))
+			log.Error("failed to edit reservation", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to drop reservation"))
+			render.JSON(w, r, resp.Error("failed to edit reservation"))
 			return
 		}
 
-		log.Info("reservation successfully dropped")
+		log.Info("reservation successfully edited")
 
 		render.JSON(w, r, resp.OK())
 	}
