@@ -20,6 +20,7 @@ const (
 	qrGetLikesAmountByPostID  = `SELECT likes_amount FROM likes_amount WHERE post_id = $1;`
 	qrGetImagePathsByPostID   = `SELECT "path" FROM post_image WHERE post_id = $1;`
 	qrGetTagsByPostID         = `SELECT tag_id, "name", color FROM post_tags WHERE post_id = $1;`
+	qrGetTags                 = `SELECT * FROM tag;`
 	qrNewTag                  = `INSERT INTO tag("name", color) VALUES ($1, $2);`
 	qrNewLike                 = `INSERT INTO "like"(user_id, post_id) VALUES ($1, $2);`
 	qrNewComment              = `INSERT INTO "comment"(user_id, post_id, "text", creation_date) VALUES ($1, $2, $3, CURRENT_TIMESTAMP);`
@@ -242,6 +243,25 @@ func (t *Tag) NewTag(storage *postgres.Storage, name, color string) error {
 	}
 
 	return nil
+}
+
+func (t *Tag) GetTags(storage *postgres.Storage) ([]Tag, error) {
+	const op = "storage.postgres.entities.news.GetTags"
+
+	qrResult, err := storage.DB.Query(qrGetTags)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	tags := []Tag{}
+	for qrResult.Next() {
+		if err := qrResult.Scan(&t.TagID, &t.Name, &t.Color); err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		tags = append(tags, *t)
+	}
+
+	return tags, nil
 }
 
 func (t *Tag) GetTagsByPostID(storage *postgres.Storage, postID int) ([]Tag, error) {

@@ -66,6 +66,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
+		// TO DO: нужна ли проверка, что обновляется свое бронирование
 		// Обновление записи бронирования в БД
 		var reservation *reservation.Reservation
 		err = reservation.UpdateReservation(storage, req.ReservationID, req.PlaceID, req.Start, req.Finish)

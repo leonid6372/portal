@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"strconv"
 	"time"
 
 	resp "portal/internal/lib/api/response"
@@ -79,7 +80,7 @@ func (bs *BearerServer) UserCredentials(w http.ResponseWriter, r *http.Request) 
 	}
 
 	refreshToken := ""
-	response, statusCode := bs.generateTokenResponse(GrantType(grantType), userData.Username, userData.Password, refreshToken, r)
+	response, role, statusCode := bs.generateTokenResponse(GrantType(grantType), userData.Username, userData.Password, refreshToken, r)
 
 	if statusCode != 200 {
 		if statusCode == 401 {
@@ -108,59 +109,68 @@ func (bs *BearerServer) UserCredentials(w http.ResponseWriter, r *http.Request) 
 			HttpOnly: true,
 		})
 
+	http.SetCookie(w,
+		&http.Cookie{
+			Name:     "role",
+			Value:    strconv.Itoa(role),
+			Expires:  time.Now().Add(2160 * time.Hour),
+			HttpOnly: true,
+		})
+
 	render.JSON(w, r, resp.OK())
 }
 
 // Generate token response
-func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential string, secret string, refreshToken string, r *http.Request) (interface{}, int) {
+func (bs *BearerServer) generateTokenResponse(grantType GrantType, credential string, secret string, refreshToken string, r *http.Request) (interface{}, int, int) {
 	var response *TokenResponse
+	var scope int
 	switch grantType {
 	case PasswordGrant:
 		scope, err := bs.verifier.ValidateUser(credential, secret, r)
 		if err != nil {
-			return "Not authorized: " + err.Error(), http.StatusUnauthorized
+			return "Not authorized: " + err.Error(), 0, http.StatusUnauthorized
 		}
 
 		token, refresh, err := bs.generateTokens(credential, scope, r)
 		if err != nil {
-			return "Token generation failed, check claims: " + err.Error(), http.StatusInternalServerError
+			return "Token generation failed, check claims: " + err.Error(), 0, http.StatusInternalServerError
 		}
 
 		if err = bs.verifier.StoreTokenID(credential, token.ID, refresh.RefreshTokenID); err != nil {
-			return "Storing Token ID failed: " + err.Error(), http.StatusInternalServerError
+			return "Storing Token ID failed: " + err.Error(), 0, http.StatusInternalServerError
 		}
 
 		if response, err = bs.cryptTokens(token, refresh); err != nil {
-			return "Token generation failed, check security provider: " + err.Error(), http.StatusInternalServerError
+			return "Token generation failed, check security provider: " + err.Error(), 0, http.StatusInternalServerError
 		}
 	case RefreshTokenGrant:
 		refresh, err := bs.provider.DecryptRefreshTokens(refreshToken)
 		if err != nil {
-			return "Not authorized: " + err.Error(), http.StatusUnauthorized
+			return "Not authorized: " + err.Error(), 0, http.StatusUnauthorized
 		}
 
 		if err = bs.verifier.ValidateTokenID(refresh.Credential, refresh.TokenID, refresh.RefreshTokenID); err != nil {
-			return "Not authorized invalid token: " + err.Error(), http.StatusUnauthorized
+			return "Not authorized invalid token: " + err.Error(), 0, http.StatusUnauthorized
 		}
 
 		token, refresh, err := bs.generateTokens(refresh.Credential, refresh.Scope, r)
 		if err != nil {
-			return "Token generation failed: " + err.Error(), http.StatusInternalServerError
+			return "Token generation failed: " + err.Error(), 0, http.StatusInternalServerError
 		}
 
 		err = bs.verifier.StoreTokenID(refresh.Credential, token.ID, refresh.RefreshTokenID)
 		if err != nil {
-			return "Storing Token ID failed: " + err.Error(), http.StatusInternalServerError
+			return "Storing Token ID failed: " + err.Error(), 0, http.StatusInternalServerError
 		}
 
 		if response, err = bs.cryptTokens(token, refresh); err != nil {
-			return "Token generation failed: " + err.Error(), http.StatusInternalServerError
+			return "Token generation failed: " + err.Error(), 0, http.StatusInternalServerError
 		}
 	default:
-		return "Invalid grant_type", http.StatusBadRequest
+		return "Invalid grant_type", 0, http.StatusBadRequest
 	}
 
-	return response, http.StatusOK
+	return response, scope, http.StatusOK
 }
 
 func (bs *BearerServer) generateTokens(username string, scope int, r *http.Request) (*Token, *RefreshToken, error) {

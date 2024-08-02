@@ -25,11 +25,13 @@ import (
 	"portal/internal/http-server/handlers/order"
 	profile "portal/internal/http-server/handlers/profile"
 	reservationHandler "portal/internal/http-server/handlers/reservation"
+	reservationDelete "portal/internal/http-server/handlers/reservation_delete"
 	reservationDrop "portal/internal/http-server/handlers/reservation_drop"
 	reservationList "portal/internal/http-server/handlers/reservation_list"
 	reservationUpdate "portal/internal/http-server/handlers/reservation_update"
 	shopList "portal/internal/http-server/handlers/shop_list"
 	"portal/internal/http-server/handlers/tag"
+	tags "portal/internal/http-server/handlers/tags"
 	updateCartItem "portal/internal/http-server/handlers/update_cart_item"
 	userReservations "portal/internal/http-server/handlers/user_reservations"
 
@@ -135,6 +137,9 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 		r.Post("/api/reservation_update", reservationUpdate.New(log, storage))
 		r.Post("/api/reservation_drop", reservationDrop.New(log, storage))
 
+		r.Post("/api/reservation_delete", reservationDelete.New(log, storage))
+		r.Post("/api/reservation_edit", reservationEdit.New(log, storage))
+
 		r.Get("/api/profile", profile.New(log, storage, storage1C))
 		r.Get("/api/me", me.New(log, storage))
 
@@ -150,13 +155,13 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 		r.Post("/api/comment", comment.New(log, storage))
 		r.Post("/api/edit_comment", editComment.New(log, storage))
 		r.Post("/api/like", like.New(log, storage))
-		//r.Get("/api/tags", tags.New(log, storage))
 
 		r.Post("/api/create_article", createPost.New(log, storage))
 		r.Post("/api/edit_article", editPost.New(log, storage))
 		r.Post("/api/delete_article", deletePost.New(log, storage))
 		r.Post("/api/delete_comment", deleteComment.New(log, storage))
 		r.Post("/api/tag", tag.New(log, storage))
+		r.Get("/api/tags", tags.New(log, storage))
 	})
 
 	// Public API group
