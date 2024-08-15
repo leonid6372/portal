@@ -41,14 +41,18 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		var req Request
 
 		// Декодируем json запроса
-		err := render.DecodeJSON(r.Body, &req)
-		// Если запрос не пустой и не смог быть декодирован
-		if !errors.Is(err, io.EOF) && err != nil {
-			log.Error("failed to decode request body", sl.Err(err))
-			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("failed to decode request"))
-			return
+		r.ParseForm()
+		intStart, err := strconv.Atoi(r.Form["start"][0][:len(r.Form["start"][0])-3]) // Cut three time zone zeroes at the end
+		if err != nil {
+			log.Error("failed to convert reservation start time", sl.Err(err))
 		}
+		req.Start = time.Unix(int64(intStart), 0)
+
+		intFinish, err := strconv.Atoi(r.Form["finish"][0][:len(r.Form["finish"][0])-3]) // Cut three time zone zeroes at the end
+		if err != nil {
+			log.Error("failed to convert reservation finish time", sl.Err(err))
+		}
+		req.Finish = time.Unix(int64(intFinish), 0)
 
 		log.Info("request body decoded", slog.Any("request", req))
 

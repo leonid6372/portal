@@ -33,7 +33,7 @@ type Place struct {
 
 type ActualPlace struct {
 	Place
-	IsAvailable bool `json:"is_available,omitempty"`
+	IsAvailable bool `json:"is_available"`
 }
 
 func (ap *ActualPlace) GetActualPlaces(storage *postgres.Storage, properties string, start, finish time.Time) ([]ActualPlace, error) {
