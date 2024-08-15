@@ -2,8 +2,7 @@ package reservationList
 
 import (
 	"encoding/json"
-	"errors"
-	"io"
+	"strconv"
 	"net/http"
 	"portal/internal/storage/postgres"
 	reservation "portal/internal/storage/postgres/entities/reservation"
