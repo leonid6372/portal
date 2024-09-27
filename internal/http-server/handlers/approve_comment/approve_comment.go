@@ -1,4 +1,4 @@
-package tag
+package approveComment
 
 import (
 	"errors"
@@ -7,8 +7,11 @@ import (
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
+	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/news"
+	"portal/internal/structs/roles"
+	"slices"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
@@ -16,8 +19,7 @@ import (
 )
 
 type Request struct {
-	Name  string `json:"name" validate:"required"`
-	Color string `json:"color" validate:"required"`
+	CommentID int
 }
 
 type Response struct {
@@ -26,12 +28,32 @@ type Response struct {
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.Tag.New"
+		const op = "handlers.approveComment.New"
 
 		log := log.With(
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
+
+		// Определяем разрешенные роли
+		allowedRoles := []int{roles.NewsEditor, roles.SuperAdmin}
+
+		// Получаем user role из токена авторизации
+		role := r.Context().Value(oauth.ScopeContext).(int)
+		if role == 0 {
+			log.Error("no user role in token")
+			w.WriteHeader(500)
+			render.JSON(w, r, resp.Error("no user role in token"))
+			return
+		}
+
+		//  Проверяем доступно ли действие для роли текущего пользователя
+		if !slices.Contains(allowedRoles, role) {
+			log.Error("access was denied")
+			w.WriteHeader(403)
+			render.JSON(w, r, resp.Error("access was denied"))
+			return
+		}
 
 		var req Request
 
@@ -57,22 +79,23 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Валидация обязательных полей запроса
 		if err := validator.New().Struct(req); err != nil {
 			validateErr := err.(validator.ValidationErrors)
-			log.Error("invalid request", sl.Err(err))
 			w.WriteHeader(400)
+			log.Error("invalid request", sl.Err(err))
 			render.JSON(w, r, resp.ValidationError(validateErr))
 			return
 		}
 
-		// Создание и добавление тэга в БД
-		var t news.Tag
-		if err := t.NewTag(storage, req.Name, req.Color); err != nil {
-			log.Error("failed to create new tag", sl.Err(err))
+		// Подтверждаем проверку комментария в БД
+		var c news.Comment
+		err = c.UpdateCommentIsChecked(storage, req.CommentID)
+		if err != nil {
+			log.Error("failed to approve comment", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to create new tag"))
+			render.JSON(w, r, resp.Error("failed to approve comment"))
 			return
 		}
 
-		log.Info("tag was successfully created")
+		log.Info("comment successfully approved")
 
 		render.JSON(w, r, resp.OK())
 	}

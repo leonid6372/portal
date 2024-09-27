@@ -1,25 +1,23 @@
-package article
+package checkComments
 
 import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"portal/internal/lib/logger/sl"
+	"portal/internal/lib/oauth"
 	"portal/internal/storage/mssql"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/news"
 	"portal/internal/storage/postgres/entities/user"
-	"strconv"
+	"portal/internal/structs/roles"
+	"slices"
 
 	resp "portal/internal/lib/api/response"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
 )
-
-type Request struct {
-	PostID int
-}
 
 type CommentInfo struct {
 	news.Comment
@@ -28,62 +26,47 @@ type CommentInfo struct {
 	Department string `json:"department"`
 }
 
-type Article struct {
-	Text     string        `json:"text"`
-	Comments []CommentInfo `json:"comments"`
-}
-
 type Response struct {
 	resp.Response
-	Article Article `json:"article"`
+	Comments []CommentInfo `json:"comments"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.article.New"
+		const op = "handlers.checkComments.New"
 
 		log := log.With(
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		var req Request
-		var err error
+		// Определяем разрешенные роли
+		allowedRoles := []int{roles.NewsEditor, roles.SuperAdmin}
 
-		// Считываем параметры запроса из request
-		r.ParseForm()
-		rawPostID, ok := r.Form["post_id"]
-		if ok {
-			req.PostID, err = strconv.Atoi(rawPostID[0])
-			if err != nil {
-				log.Error("failed to make int post id", sl.Err(err))
-				w.WriteHeader(500)
-				render.JSON(w, r, resp.Error("failed to make int post id"))
-				return
-			}
-		} else {
-			log.Error("empty post id parameter")
-			w.WriteHeader(400)
-			render.JSON(w, r, resp.Error("empty post id parameter"))
+		// Получаем user role из токена авторизации
+		role := r.Context().Value(oauth.ScopeContext).(int)
+		if role == 0 {
+			log.Error("no user role in token")
+			w.WriteHeader(500)
+			render.JSON(w, r, resp.Error("no user role in token"))
 			return
 		}
 
-		// Получаем текст поста в p по ID поста
-		var p news.Post
-		if err := p.GetText(storage, req.PostID); err != nil {
-			log.Error("failed to get post text", sl.Err(err))
-			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get post text"))
+		//  Проверяем доступно ли действие для роли текущего пользователя
+		if !slices.Contains(allowedRoles, role) {
+			log.Error("access was denied")
+			w.WriteHeader(403)
+			render.JSON(w, r, resp.Error("access was denied"))
 			return
 		}
 
 		// Получаем все комментарии по post ID
 		var c news.Comment
-		cs, err := c.GetCommentsByPostID(storage, req.PostID)
+		cs, err := c.GetUncheckedComments(storage)
 		if err != nil {
-			log.Error("failed to get post text", sl.Err(err))
+			log.Error("failed to get unchecked comments", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get post text"))
+			render.JSON(w, r, resp.Error("failed to get unchecked comments"))
 			return
 		}
 
@@ -114,21 +97,14 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 			csi = append(csi, ci)
 		}
 
-		article := Article{
-			Text:     p.Text,
-			Comments: csi,
-		}
-
-		log.Info("article data successfully gotten")
-
-		responseOK(w, r, log, article)
+		responseOK(w, r, log, csi)
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, article Article) {
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, commentsInfo []CommentInfo) {
 	response, err := json.Marshal(Response{
 		Response: resp.OK(),
-		Article:  article,
+		Comments: commentsInfo,
 	})
 	if err != nil {
 		log.Error("failed to process response", sl.Err(err))

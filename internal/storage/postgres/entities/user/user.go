@@ -9,7 +9,8 @@ import (
 
 const (
 	qrNewUser                   = `INSERT INTO "user" (role, balance, username) VALUES (50, 0, $1) RETURNING user_id, role;`
-	qrGetUserFullname           = `SELECT _Fld7254 FROM [10295].[dbo].[_InfoRg7251] WHERE _Fld7252 = $1;`
+	qrGetUserFullName           = `SELECT _Fld7254 FROM [10295].[dbo].[_InfoRg7251] WHERE _Fld7252 = $1;`
+	qrGetUserInfo               = `SELECT _Fld7254, _Fld7255, _Fld7256 FROM [10295].[dbo].[_InfoRg7251] WHERE _Fld7252 = $1;`
 	qrGetRole                   = `SELECT "role" FROM "user" WHERE username = $1;`
 	qrGetPassByUsername         = `SELECT "password" FROM "user" WHERE username = $1;`
 	qrGetUserIDByUsername       = `SELECT user_id FROM "user" WHERE username = $1;`
@@ -22,12 +23,15 @@ const (
 )
 
 type User struct {
-	UserID   int    `json:"user_id,omitempty"`
-	Data1C   string `json:"data_1c,omitempty"`
-	Username string `json:"username,omitempty"`
-	Balance  int    `json:"balance,omitempty"`
-	Password string `json:"password,omitempty"`
-	Role     int    `json:"role,omitempty"`
+	UserID     int    `json:"user_id,omitempty"`
+	Data1C     string `json:"data_1c,omitempty"`
+	Username   string `json:"username,omitempty"`
+	FullName   string `json:"full_name,omitempty"`
+	Position   string `json:"position,omitempty"`
+	Department string `json:"department,omitempty"`
+	Balance    int    `json:"balance,omitempty"`
+	Password   string `json:"password,omitempty"`
+	Role       int    `json:"role,omitempty"`
 }
 
 func (u *User) NewUser(storage *postgres.Storage, username string) error {
@@ -65,7 +69,7 @@ func (u *User) ValidateUser(storage *postgres.Storage, storage1C *mssql.Storage,
 	const op = "storage.postgres.entities.user.ValidateUser"
 
 	// Проверяем username в БД 1С
-	stmt, err := storage1C.DB.Prepare(qrGetUserFullname)
+	stmt, err := storage1C.DB.Prepare(qrGetUserFullName)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -123,6 +127,40 @@ func (u *User) GetUsername(storage *postgres.Storage, userID int) error {
 	const op = "storage.postgres.entities.user.GetUsername"
 
 	err := storage.DB.QueryRow(qrGetUsernameByUserID, userID).Scan(&u.Username)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (u *User) GetUserInfo(storage1C *mssql.Storage, username string) error {
+	const op = "storage.postgres.entities.user.GetUserInfo"
+
+	stmt, err := storage1C.DB.Prepare(qrGetUserInfo)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	defer stmt.Close()
+
+	err = stmt.QueryRow(username).Scan(&u.FullName, &u.Position, &u.Department)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (u *User) GetFullNameByUsername(storage1C *mssql.Storage, username string) error {
+	const op = "storage.postgres.entities.user.GetFullNameByUsername"
+
+	stmt, err := storage1C.DB.Prepare(qrGetUserFullName)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	defer stmt.Close()
+
+	err = stmt.QueryRow(username).Scan(&u.FullName)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}

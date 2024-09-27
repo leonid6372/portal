@@ -10,12 +10,12 @@ import (
 
 const (
 	// Получение актуальных мест 1. делаем все места "доступно" и вычитаем занятые 2. прибавляем занятые с пометкой "недостпуно"
-	qrGetActualPlaces = `(SELECT place_id, "name", true AS is_available FROM place
+	qrGetActualPlaces = `(SELECT place_id, "name", COALESCE(phone, ''), true AS is_available, 0 AS user_id FROM place
 						  EXCEPT
-						  SELECT DISTINCT place_id, "name", true AS is_available FROM place_and_reservation
+						  SELECT DISTINCT place_id, "name", COALESCE(phone, ''), true AS is_available, 0 FROM place_and_reservation
 						  WHERE ($1, $2) OVERLAPS ("start", finish))
 						  UNION
-						  (SELECT DISTINCT place_id, "name", false AS is_available FROM place_and_reservation
+						  (SELECT DISTINCT place_id, "name", COALESCE(phone, ''), false AS is_available, user_id FROM place_and_reservation
 						  WHERE ($1, $2) OVERLAPS ("start", finish))
 						  ORDER BY place_id;`
 	qrGetReservationsByUserID = `SELECT reservation_id, place_id, start, finish FROM reservation WHERE user_id = $1;`
@@ -26,14 +26,17 @@ const (
 )
 
 type Place struct {
-	PlaceID    int    `json:"place_id,omitempty"`
-	Name       string `json:"name,omitempty"`
-	Properties string `json:"properties,omitempty"`
+	PlaceID      int    `json:"place_id,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Phone        string `json:"phone,omitempty"`
+	Internet     string `json:"internet,omitempty"`
+	SecondScreen string `json:"second_screen,omitempty"`
 }
 
 type ActualPlace struct {
 	Place
 	IsAvailable bool `json:"is_available"`
+	UserID      int  `json:"user_id"`
 }
 
 func (ap *ActualPlace) GetActualPlaces(storage *postgres.Storage, properties string, start, finish time.Time) ([]ActualPlace, error) {
@@ -48,7 +51,7 @@ func (ap *ActualPlace) GetActualPlaces(storage *postgres.Storage, properties str
 
 	for qrResult.Next() {
 		var ap ActualPlace
-		if err := qrResult.Scan(&ap.PlaceID, &ap.Name, &ap.IsAvailable); err != nil {
+		if err := qrResult.Scan(&ap.PlaceID, &ap.Name, &ap.Phone, &ap.IsAvailable, &ap.UserID); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 		aps = append(aps, ap)

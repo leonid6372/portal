@@ -9,6 +9,7 @@ import (
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/news"
 	"strconv"
+	"time"
 
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
@@ -22,8 +23,10 @@ var (
 )
 
 type Request struct {
-	Tags []string
-	Page int
+	Tags          []string
+	Page          int
+	CreatedAfter  time.Time
+	CreatedBefore time.Time
 }
 
 // Запрашиваемая API структура
@@ -66,10 +69,30 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		} else {
 			req.Page = 1
 		}
+		rawCreatedAfter, ok := r.Form["start"]
+		if ok {
+			intCreatedAfter, err := strconv.Atoi(rawCreatedAfter[0][:len(rawCreatedAfter[0])-3]) // Cut three time zone zeroes at the end
+			if err != nil {
+				log.Error("failed to convert reservation start time", sl.Err(err))
+			}
+			req.CreatedAfter = time.Unix(int64(intCreatedAfter), 0)
+		} else { // Если не задана начальная дата создания поста для фильтра, то выводим все от самого начала
+			req.CreatedAfter = time.Time{}
+		}
+		rawCreatedBefore, ok := r.Form["finish"]
+		if ok {
+			intCreatedBefore, err := strconv.Atoi(rawCreatedBefore[0][:len(rawCreatedBefore[0])-3]) // Cut three time zone zeroes at the end
+			if err != nil {
+				log.Error("failed to convert reservation finish time", sl.Err(err))
+			}
+			req.CreatedBefore = time.Unix(int64(intCreatedBefore), 0)
+		} else { // Если не задана крайняя дата создания поста для фильтра, то выводим все до сейчас
+			req.CreatedBefore = time.Now()
+		}
 
 		// Запрашиваем все посты из БД
 		var p news.Post
-		ps, err := p.GetPostsPage(storage, req.Tags, req.Page)
+		ps, err := p.GetPostsPage(storage, req.Tags, req.Page, req.CreatedAfter, req.CreatedBefore)
 		// Случай когда указана страница вне диапазона
 		if errors.As(err, &(storageHandler.ErrPageInOutOfRange)) {
 			log.Debug("failed to get catalog", sl.Err(err))
