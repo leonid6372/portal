@@ -85,7 +85,7 @@ func (ba *BearerAuthentication) Authorize(next http.Handler) http.Handler {
 			render.JSON(w, r, resp.Error("Not authorized"))
 			return
 		}
-		fmt.Println(token.Scope)
+
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, CredentialContext, token.Credential)
 		ctx = context.WithValue(ctx, ClaimsContext, token.Claims)

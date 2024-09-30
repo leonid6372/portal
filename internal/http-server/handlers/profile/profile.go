@@ -26,7 +26,7 @@ const (
 // Временная вспомогательная структура
 type Profile struct {
 	Fld7252 string `json:"username"`   // username
-	Fld7254 string `json:"fullname"`   // fullname
+	Fld7254 string `json:"full_name"`  // fullname
 	Fld7255 string `json:"position"`   // position
 	Fld7256 string `json:"department"` // department
 	Fld7257 string `json:"birthday"`   // birthday

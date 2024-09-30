@@ -1,4 +1,4 @@
-package tag
+package lockerReservationUpdate
 
 import (
 	"errors"
@@ -8,16 +8,19 @@ import (
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
-	"portal/internal/storage/postgres/entities/news"
+	"portal/internal/storage/postgres/entities/reservation"
+	"time"
 
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 )
 
 type Request struct {
-	Name  string `json:"name" validate:"required"`
-	Color string `json:"color" validate:"required"`
+	LockerReservationID int       `json:"locker_reservation_id" validate:"required"`
+	LockerID            int       `json:"locker_id" validate:"required"`
+	Start               time.Time `json:"start" validate:"required"`
+	Finish              time.Time `json:"finish" validate:"required"`
 }
 
 type Response struct {
@@ -26,7 +29,7 @@ type Response struct {
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.Tag.New"
+		const op = "handlers.lockerReservationUpdate.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -57,22 +60,24 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 		// Валидация обязательных полей запроса
 		if err := validator.New().Struct(req); err != nil {
 			validateErr := err.(validator.ValidationErrors)
-			log.Error("invalid request", sl.Err(err))
 			w.WriteHeader(400)
+			log.Error("invalid request", sl.Err(err))
 			render.JSON(w, r, resp.ValidationError(validateErr))
 			return
 		}
 
-		// Создание и добавление тэга в БД
-		var t news.Tag
-		if err := t.NewTag(storage, req.Name, req.Color); err != nil {
-			log.Error("failed to create new tag", sl.Err(err))
+		// TO DO: нужна ли проверка, что обновляется свое бронирование
+		// Обновление записи бронирования в БД
+		var lockerReservation *reservation.LockerReservation
+		err = lockerReservation.UpdateLockerReservation(storage, req.LockerReservationID, req.LockerID, req.Start, req.Finish)
+		if err != nil {
+			log.Error("failed to update locker reservation", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to create new tag"))
+			render.JSON(w, r, resp.Error("failed to update locker reservation"))
 			return
 		}
 
-		log.Info("tag was successfully created")
+		log.Info("locker reservation successfully updated")
 
 		render.JSON(w, r, resp.OK())
 	}

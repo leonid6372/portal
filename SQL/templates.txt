@@ -45,7 +45,9 @@ CREATE VIEW in_active_cart_item AS
 CREATE TABLE place(
 	place_id SERIAL PRIMARY KEY,
 	name varchar(64),
-	properties text
+	phone varchar(32) UNIQUE,
+	internet bool,
+	second_screen bool
 );
 
 CREATE TABLE reservation(
@@ -57,9 +59,28 @@ CREATE TABLE reservation(
 );
 
 CREATE VIEW place_and_reservation AS (
-	SELECT reservation.place_id, place.name, reservation.start, reservation.finish
+	SELECT reservation.place_id, place.name, place.phone, reservation.start, reservation.finish, reservation.user_id
  	FROM reservation
  	JOIN place ON reservation.place_id = place.place_id
+);
+
+CREATE TABLE locker(
+	locker_id SERIAL PRIMARY KEY,
+	name varchar(64)
+);
+
+CREATE TABLE locker_reservation(
+	locker_reservation_id SERIAL PRIMARY KEY,
+	locker_id int REFERENCES locker(locker_id) ON DELETE CASCADE,
+	"start" timestamp,
+	finish timestamp,
+	user_id int REFERENCES "user"(user_id) ON DELETE CASCADE
+);
+
+CREATE VIEW locker_and_locker_reservation AS (
+	SELECT locker_reservation.locker_id, locker.name, locker_reservation.start, locker_reservation.finish, locker_reservation.user_id
+ 	FROM locker_reservation
+ 	JOIN locker ON locker_reservation.locker_id = locker.locker_id
 );
 
 CREATE TABLE post(
@@ -101,7 +122,8 @@ CREATE TABLE comment(
 	post_id INT REFERENCES post(post_id) ON DELETE CASCADE,
 	"text" text,
 	creation_date timestamp NOT NULL,
-	update_date timestamp
+	update_date timestamp,
+	is_checked boolean NOT NULL
 );
 
 CREATE VIEW likes_amount AS (

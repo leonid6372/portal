@@ -8,9 +8,11 @@ import (
 	"os/signal"
 	"portal/internal/config"
 	addCartItem "portal/internal/http-server/handlers/add_cart_item"
+	approveComment "portal/internal/http-server/handlers/approve_comment"
 	"portal/internal/http-server/handlers/article"
 	"portal/internal/http-server/handlers/articles"
 	cartData "portal/internal/http-server/handlers/cart_data"
+	checkComments "portal/internal/http-server/handlers/check_comments"
 	"portal/internal/http-server/handlers/comment"
 	createPost "portal/internal/http-server/handlers/create_post"
 	deleteComment "portal/internal/http-server/handlers/delete_comment"
@@ -21,18 +23,24 @@ import (
 	editComment "portal/internal/http-server/handlers/edit_comment"
 	editPost "portal/internal/http-server/handlers/edit_post"
 	"portal/internal/http-server/handlers/like"
+	lockerReservation "portal/internal/http-server/handlers/locker_reservation"
+	lockerReservationDrop "portal/internal/http-server/handlers/locker_reservation_drop"
+	lockerReservationList "portal/internal/http-server/handlers/locker_reservation_list"
+	lockerReservationUpdate "portal/internal/http-server/handlers/locker_reservation_update"
 	"portal/internal/http-server/handlers/me"
 	"portal/internal/http-server/handlers/order"
 	profile "portal/internal/http-server/handlers/profile"
 	reservationHandler "portal/internal/http-server/handlers/reservation"
 	reservationDelete "portal/internal/http-server/handlers/reservation_delete"
 	reservationDrop "portal/internal/http-server/handlers/reservation_drop"
+	reservationEdit "portal/internal/http-server/handlers/reservation_edit"
 	reservationList "portal/internal/http-server/handlers/reservation_list"
 	reservationUpdate "portal/internal/http-server/handlers/reservation_update"
 	shopList "portal/internal/http-server/handlers/shop_list"
 	"portal/internal/http-server/handlers/tag"
 	tags "portal/internal/http-server/handlers/tags"
 	updateCartItem "portal/internal/http-server/handlers/update_cart_item"
+	userLockerReservations "portal/internal/http-server/handlers/user_locker_reservations"
 	userReservations "portal/internal/http-server/handlers/user_reservations"
 
 	setupLogger "portal/internal/lib/logger/setup_logger"
@@ -132,13 +140,19 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 		// use the Bearer Authentication middleware
 		r.Use(oauth.Authorize(secret, nil, bearerServer, log))
 		r.Post("/api/reservation", reservationHandler.New(log, storage))
-		r.Get("/api/reservation_list", reservationList.New(log, storage))
+		r.Get("/api/reservation_list", reservationList.New(log, storage, storage1C))
 		r.Get("/api/user_reservations", userReservations.New(log, storage))
 		r.Post("/api/reservation_update", reservationUpdate.New(log, storage))
 		r.Post("/api/reservation_drop", reservationDrop.New(log, storage))
 
 		r.Post("/api/reservation_delete", reservationDelete.New(log, storage))
 		r.Post("/api/reservation_edit", reservationEdit.New(log, storage))
+
+		r.Post("/api/locker_reservation", lockerReservation.New(log, storage))
+		r.Get("/api/locker_reservation_list", lockerReservationList.New(log, storage, storage1C))
+		r.Get("/api/user_locker_reservations", userLockerReservations.New(log, storage))
+		r.Post("/api/locker_reservation_update", lockerReservationUpdate.New(log, storage))
+		r.Post("/api/locker_reservation_drop", lockerReservationDrop.New(log, storage))
 
 		r.Get("/api/profile", profile.New(log, storage, storage1C))
 		r.Get("/api/me", me.New(log, storage))
@@ -154,12 +168,16 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 
 		r.Post("/api/comment", comment.New(log, storage))
 		r.Post("/api/edit_comment", editComment.New(log, storage))
+		r.Get("/api/check_comments", checkComments.New(log, storage, storage1C))
+		r.Post("/api/approve_comment", approveComment.New(log, storage))
+		r.Post("/api/delete_comment", deleteComment.New(log, storage))
+
 		r.Post("/api/like", like.New(log, storage))
 
 		r.Post("/api/create_article", createPost.New(log, storage))
 		r.Post("/api/edit_article", editPost.New(log, storage))
 		r.Post("/api/delete_article", deletePost.New(log, storage))
-		r.Post("/api/delete_comment", deleteComment.New(log, storage))
+
 		r.Post("/api/tag", tag.New(log, storage))
 		r.Get("/api/tags", tags.New(log, storage))
 	})
@@ -169,6 +187,6 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 		r.Post("/api/login", bearerServer.UserCredentials)
 
 		r.Get("/api/articles", articles.New(log, storage))
-		r.Get("/api/article", article.New(log, storage))
+		r.Get("/api/article", article.New(log, storage, storage1C))
 	})
 }
