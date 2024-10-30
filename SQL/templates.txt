@@ -1,6 +1,8 @@
 CREATE TABLE "user"(
 	user_id SERIAL PRIMARY KEY,
-	"1c" JSONB,
+	name varchar(150),
+	position varchar(150),
+	department varchar(150),
 	balance INT,
 	"role" INT NOT NULL,
 	"password" varchar(50),

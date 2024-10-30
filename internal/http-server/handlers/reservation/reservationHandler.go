@@ -2,6 +2,7 @@ package reservationHandler
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
 	reservation "portal/internal/storage/postgres/entities/reservation"
+	"time"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
@@ -17,9 +19,9 @@ import (
 )
 
 type Request struct {
-	PlaceID int    `json:"place_id" validate:"required"`
-	Start   string `json:"start" validate:"required"`
-	Finish  string `json:"finish" validate:"required"`
+	PlaceID int `json:"place_id" validate:"required"`
+	Start   int `json:"start" validate:"required"`
+	Finish  int `json:"finish" validate:"required"`
 }
 
 type Response struct {
@@ -75,9 +77,32 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
-		// Добавление записи бронирования в БД
+		req.Start /= 1000 // Cut three time zone zeroes at the end
+		rawStart := time.Unix(int64(req.Start), 0)
+		start := rawStart.Format(time.DateOnly)
+
+		req.Finish /= 1000 // Cut three time zone zeroes at the end
+		rawFinish := time.Unix(int64(req.Finish), 0)
+		finish := rawFinish.Format(time.DateOnly) + " 23:59:00"
+
+		// Проверка наличия брони у пользователя в эту дату
 		var reservation *reservation.Reservation
-		err = reservation.InsertReservation(storage, req.PlaceID, userID, req.Start, req.Finish)
+		hasUserReservation, err := reservation.HasUserReservationInDateRange(storage, userID, start, finish)
+		if err != nil {
+			log.Error("failed to check has user reservation if date range", sl.Err(err))
+			w.WriteHeader(422)
+			render.JSON(w, r, resp.Error("failed to check has user reservation if date range"))
+			return
+		}
+		if hasUserReservation {
+			log.Error(fmt.Sprintf("%s: user already has reservation in date range"), op)
+			w.WriteHeader(406)
+			render.JSON(w, r, resp.Error("user already has reservation in date range"))
+			return
+		}
+
+		// Добавление записи бронирования в БД
+		err = reservation.InsertReservation(storage, req.PlaceID, userID, start, finish)
 		if err != nil {
 			log.Error("failed to reserve place", sl.Err(err))
 			w.WriteHeader(422)

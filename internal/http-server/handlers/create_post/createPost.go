@@ -20,8 +20,8 @@ import (
 )
 
 type Request struct {
-	Title  string   `json:"item_id" validate:"required"`
-	Text   string   `json:"quantity" validate:"required"`
+	Title  string   `json:"title" validate:"required"`
+	Text   string   `json:"text" validate:"required"`
 	Images []string `json:"images" validate:"required"`
 	Tags   []int    `json:"tags" validate:"required"`
 }
