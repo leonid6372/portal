@@ -21,8 +21,8 @@ import (
 
 type Request struct {
 	PostID int      `json:"post_id" validate:"required"`
-	Title  string   `json:"item_id" validate:"required"`
-	Text   string   `json:"quantity" validate:"required"`
+	Title  string   `json:"title" validate:"required"`
+	Text   string   `json:"text" validate:"required"`
 	Images []string `json:"images" validate:"required"`
 	Tags   []int    `json:"tags" validate:"required"`
 }
@@ -119,7 +119,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 		// Добавляем новые URL изображений к посту
 		for _, image := range req.Images {
-			if err := pi.NewPostImage(storage, p.PostID, image); err != nil {
+			if err := pi.NewPostImage(storage, req.PostID, image); err != nil {
 				log.Error("failed to add image to post", sl.Err(err))
 				w.WriteHeader(422)
 				render.JSON(w, r, resp.Error("failed to add image to post"))
@@ -129,7 +129,7 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 
 		// Добавляем новые тэги к посту
 		for _, tag := range req.Tags {
-			if err := ipt.NewInPostTag(storage, p.PostID, tag); err != nil {
+			if err := ipt.NewInPostTag(storage, req.PostID, tag); err != nil {
 				log.Error("failed to add tag to post", sl.Err(err))
 				w.WriteHeader(422)
 				render.JSON(w, r, resp.Error("failed to add tag to post"))

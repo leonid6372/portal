@@ -14,7 +14,7 @@ type Storage struct {
 }
 
 func New(cfg config.SQL) (*Storage, error) {
-	const op = "storage.postgres.NewStorage" // Имя текущей функции для логов и ошибок
+	const op = "storage.postgres.New" // Имя текущей функции для логов и ошибок
 
 	DB, err := sql.Open(cfg.PostgresDriver, cfg.PostgresInfo) // Подключаемся к БД
 	if err != nil {

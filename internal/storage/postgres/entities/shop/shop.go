@@ -51,6 +51,7 @@ func (i *Item) GetIsAvailable(storage *postgres.Storage, itemID int) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
+	defer qrResult.Close()
 
 	if !qrResult.Next() {
 		return fmt.Errorf("%s: %w", op, "item is not exist")
@@ -70,6 +71,7 @@ func (i *Item) GetItems(storage *postgres.Storage) ([]Item, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+	defer qrResult.Close()
 
 	var is []Item
 
@@ -130,6 +132,7 @@ func (ici *InCartItem) GetInCartItems(storage *postgres.Storage, cartID int) ([]
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+	defer qrResult.Close()
 
 	icis := []InCartItem{}
 
@@ -169,6 +172,7 @@ func (c *Cart) GetActiveCartID(storage *postgres.Storage, userID int) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
+	defer qrResult.Close()
 
 	if !qrResult.Next() {
 		return fmt.Errorf("%s: %w", op, storageHandler.ErrCartDoesNotExist)

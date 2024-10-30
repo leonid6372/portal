@@ -14,7 +14,7 @@ type Storage struct {
 }
 
 func New(cfg config.SQL) (*Storage, error) {
-	const op = "storage.mssql.NewStorage" // Имя текущей функции для логов и ошибок
+	const op = "storage.mssql.New" // Имя текущей функции для логов и ошибок
 
 	DB, err := sql.Open(cfg.MssqlDriver, cfg.MssqlInfo)
 	if err != nil {

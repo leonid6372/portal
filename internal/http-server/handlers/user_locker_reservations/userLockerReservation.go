@@ -15,9 +15,14 @@ import (
 	"github.com/go-chi/render"
 )
 
+type LockerReservationInfo struct {
+	reservation.LockerReservation
+	LockerName string `json:"locker_name"`
+}
+
 type Response struct {
 	resp.Response
-	LockerReservations []reservation.LockerReservation `json:"user_locker_reservations"`
+	LockerReservationsInfo []LockerReservationInfo `json:"user_locker_reservations"`
 }
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
@@ -49,16 +54,34 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
-		log.Info("user reservations gotten")
+		// Добавляем имя шкафчика к списку бронирований
+		var lrsi []LockerReservationInfo
+		for _, lockerReserv := range lockerReservations {
+			lri := LockerReservationInfo{LockerReservation: lockerReserv}
 
-		responseOK(w, r, log, lockerReservations)
+			var locker reservation.Locker
+			err = locker.GetLockerName(storage, lockerReserv.LockerID)
+			if err != nil {
+				log.Error("failed to get locker name", sl.Err(err))
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to get locker name"))
+				return
+			}
+
+			lri.LockerName = locker.Name
+			lrsi = append(lrsi, lri)
+		}
+
+		log.Info("user locker reservations gotten")
+
+		responseOK(w, r, log, lrsi)
 	}
 }
 
-func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, lockerReservations []reservation.LockerReservation) {
+func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, lockerReservationsInfo []LockerReservationInfo) {
 	response, err := json.Marshal(Response{
-		Response:           resp.OK(),
-		LockerReservations: lockerReservations,
+		Response:               resp.OK(),
+		LockerReservationsInfo: lockerReservationsInfo,
 	})
 	if err != nil {
 		log.Error("failed to process response", sl.Err(err))

@@ -2,7 +2,6 @@ package profile
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/user"
@@ -19,17 +18,13 @@ import (
 	"portal/internal/storage/mssql"
 )
 
-const (
-	qrGetUserByUsername = `SELECT _Fld7252, _Fld7254, _Fld7255, _Fld7256, _Fld7257 FROM [10295].[dbo].[_InfoRg7251] WHERE _Fld7252 = $1;`
-)
-
 // Временная вспомогательная структура
 type Profile struct {
-	Fld7252 string `json:"username"`   // username
-	Fld7254 string `json:"full_name"`  // fullname
-	Fld7255 string `json:"position"`   // position
-	Fld7256 string `json:"department"` // department
-	Fld7257 string `json:"birthday"`   // birthday
+	Username   string `json:"username"`
+	FullName   string `json:"full_name"`
+	Position   string `json:"position"`
+	Department string `json:"department"`
+	//Birthday   string `json:"birthday"`
 }
 
 type Response struct {
@@ -83,19 +78,18 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 			return
 		}
 
-		// Получаем данные пользователя по username из БД MSSQL
-		p := Profile{Fld7252: u.Username}
-		err = p.GetUserByUsername(storage1C)
+		// Получаем user info из БД
+		err = u.GetUserInfo(storage, u.Username)
 		if err != nil {
-			log.Error("failed to get profile", sl.Err(err))
+			log.Error("failed to get user info", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get profile"))
+			render.JSON(w, r, resp.Error("failed to get user info"))
 			return
 		}
 
 		log.Info("profile data successfully gotten")
 
-		responseOK(w, r, log, p)
+		responseOK(w, r, log, Profile{Username: u.Username, FullName: u.FullName, Position: u.Position, Department: u.Department})
 	}
 }
 
@@ -112,31 +106,4 @@ func responseOK(w http.ResponseWriter, r *http.Request, log *slog.Logger, profil
 	}
 
 	render.Data(w, r, response)
-}
-
-func (p *Profile) GetUserByUsername(storage1C *mssql.Storage) error {
-	const op = "storage.postgres.entities.user.GetUserByUsername"
-
-	// Проверяем username в БД 1С
-	stmt, err := storage1C.DB.Prepare(qrGetUserByUsername)
-	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
-	}
-	defer stmt.Close()
-
-	qrResult, err := stmt.Query(p.Fld7252)
-	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
-	}
-
-	// Проверка на пустой ответ
-	if !qrResult.Next() {
-		return fmt.Errorf("%s: wrong username", op)
-	}
-
-	if err := qrResult.Scan(&p.Fld7252, &p.Fld7254, &p.Fld7255, &p.Fld7256, &p.Fld7257); err != nil {
-		return fmt.Errorf("%s: %w", op, err)
-	}
-
-	return nil
 }

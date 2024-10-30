@@ -81,9 +81,9 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 		var c news.Comment
 		cs, err := c.GetCommentsByPostID(storage, req.PostID)
 		if err != nil {
-			log.Error("failed to get post text", sl.Err(err))
+			log.Error("failed to get comments", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to get post text"))
+			render.JSON(w, r, resp.Error("failed to get comments"))
 			return
 		}
 
@@ -100,7 +100,7 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 				render.JSON(w, r, resp.Error("failed to get username"))
 				return
 			}
-			err = u.GetUserInfo(storage1C, u.Username)
+			err = u.GetUserInfo(storage, u.Username)
 			if err != nil {
 				log.Error("failed to get user info", sl.Err(err))
 				w.WriteHeader(422)

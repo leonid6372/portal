@@ -46,6 +46,7 @@ import (
 	setupLogger "portal/internal/lib/logger/setup_logger"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
+	ldapServer "portal/internal/storage/ldap"
 	"portal/internal/storage/mssql"
 	"portal/internal/storage/postgres"
 	"syscall"
@@ -58,7 +59,8 @@ import (
 func main() {
 	cfg := config.MustLoad()
 
-	log := setupLogger.New(cfg.LogLVL)
+	log, logFile := setupLogger.New(cfg.LogLVL)
+	defer logFile.Close()
 
 	// Подключение и закрытие базы PSQL
 	storage, err := postgres.New(cfg.SQL)
@@ -82,10 +84,21 @@ func main() {
 		log.Info("1C storage closed")
 	}()
 
+	// Подключение и закрытие LDAP сервера
+	ldapsrv, err := ldapServer.New(cfg.LDAPServer.FQDN, cfg.LDAPServer.BaseDN, cfg.LDAPServer.UserAccountControl)
+	if err != nil {
+		log.Error("failed to init LDAP server", sl.Err(err))
+		os.Exit(1)
+	}
+	defer func() {
+		ldapsrv.LDAPConn.Close()
+		log.Info("LDAP server closed")
+	}()
+
 	bearerServer := oauth.NewBearerServer(
 		cfg.BearerServer.Secret,
 		cfg.BearerServer.TokenTTL,
-		&oauth.UserVerifier{Storage: storage, Storage1C: storage1C, Log: log},
+		&oauth.UserVerifier{Storage: storage /*Storage1C: storage1C*/, LDAPServer: ldapsrv, Log: log},
 		nil)
 
 	router := chi.NewRouter()
@@ -179,6 +192,7 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 		r.Post("/api/delete_article", deletePost.New(log, storage))
 
 		r.Post("/api/tag", tag.New(log, storage))
+		r.Post("/api/delete_tag", tag.New(log, storage))
 		r.Get("/api/tags", tags.New(log, storage))
 	})
 

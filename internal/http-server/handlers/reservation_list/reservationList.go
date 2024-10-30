@@ -55,6 +55,9 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 			intStart, err := strconv.Atoi(rawStart[0][:len(rawStart[0])-3]) // Cut three time zone zeroes at the end
 			if err != nil {
 				log.Error("failed to convert reservation start time", sl.Err(err))
+				w.WriteHeader(500)
+				render.JSON(w, r, resp.Error("failed to convert reservation start time"))
+				return
 			}
 			req.Start = time.Unix(int64(intStart), 0)
 		}
@@ -64,6 +67,9 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 			intFinish, err := strconv.Atoi(rawFinish[0][:len(rawFinish[0])-3]) // Cut three time zone zeroes at the end
 			if err != nil {
 				log.Error("failed to convert reservation finish time", sl.Err(err))
+				w.WriteHeader(500)
+				render.JSON(w, r, resp.Error("failed to convert reservation start time"))
+				return
 			}
 			req.Finish = time.Unix(int64(intFinish), 0)
 		}
@@ -101,7 +107,7 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 					render.JSON(w, r, resp.Error("failed to get username"))
 					return
 				}
-				err = u.GetUserInfo(storage1C, u.Username)
+				err = u.GetUserInfo(storage, u.Username)
 				if err != nil {
 					log.Error("failed to get user info", sl.Err(err))
 					w.WriteHeader(422)

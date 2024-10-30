@@ -10,13 +10,13 @@ import (
 
 const (
 	// COALESCE() устанавливает значение update_date равное creation_date, если первое равно null, т.к. нельзя считать null в *time.Time
-	qrGetPostsPage            = `SELECT post_id, title, "text", creation_date, COALESCE(update_date, creation_date) AS update_date FROM post WHERE $1 < creation_date AND creation_date < $2 LIMIT $3 OFFSET $4;`
+	qrGetPostsPage            = `SELECT post_id, title, "text", creation_date, COALESCE(update_date, creation_date) AS update_date FROM post WHERE $1 < creation_date AND creation_date < $2 ORDER BY creation_date DESC LIMIT $3 OFFSET $4;`
 	qrGetPostsIDByDateFilter  = `SELECT post_id FROM post WHERE $1 < creation_date AND creation_date < $2`
 	qrGetPostByID             = `SELECT title, "text", creation_date, COALESCE(update_date, creation_date) AS update_date FROM post WHERE post_id = $1;`
 	qrGetPostsAmount          = `SELECT count(post_id) FROM post;`
 	qrGetPostText             = `SELECT "text" FROM post WHERE post_id = $1;`
-	qrGetCommentsByPostID     = `SELECT comment_id, user_id, post_id, text, creation_date, COALESCE(update_date, creation_date) AS update_date FROM comment WHERE post_id = $1;`
-	qrGetUncheckedComments    = `SELECT comment_id, user_id, post_id, text, creation_date, COALESCE(update_date, creation_date) AS update_date, is_checked FROM comment WHERE is_checked = FALSE;`
+	qrGetCommentsByPostID     = `SELECT comment_id, user_id, post_id, text, creation_date, COALESCE(update_date, creation_date) AS update_date FROM comment WHERE post_id = $1 AND is_checked = TRUE;`
+	qrGetUncheckedComments    = `SELECT comment_id, user_id, post_id, text, creation_date, COALESCE(update_date, creation_date) AS update_date FROM comment WHERE is_checked = FALSE;`
 	qrUpdatePost              = `UPDATE post SET title = $1, "text" = $2, update_date = CURRENT_TIMESTAMP WHERE post_id = $3;`
 	qrUpdateCommentText       = `UPDATE comment SET "text" = $1, update_date = CURRENT_TIMESTAMP, is_checked = FALSE WHERE comment_id = $2;`
 	qrUpdateCommentIsChecked  = `UPDATE comment SET is_checked = TRUE WHERE comment_id = $1;`
@@ -27,11 +27,12 @@ const (
 	qrNewTag                  = `INSERT INTO tag("name", color) VALUES ($1, $2);`
 	qrNewLike                 = `INSERT INTO "like"(user_id, post_id) VALUES ($1, $2);`
 	qrNewComment              = `INSERT INTO "comment"(user_id, post_id, "text", creation_date, is_checked) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, FALSE);`
-	qrNewPost                 = `INSERT INTO post(title, "text", creattion_date, update_date) VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING post_id;`
+	qrNewPost                 = `INSERT INTO post(title, "text", creation_date, update_date) VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING post_id;`
 	qrNewPostImage            = `INSERT INTO post_image(post_id, "path") VALUES ($1, $2);`
 	qrNewInPostTag            = `INSERT INTO in_post_tag(post_id, tag_id) VALUES ($1, $2);`
-	qrDeleteInPostTagByPostID = `DELETE FROM in_post_image WHERE post_id = $1;`
+	qrDeleteInPostTagByPostID = `DELETE FROM in_post_tag WHERE post_id = $1;`
 	qrDeleteComment           = `DELETE FROM comment WHERE comment_id = $1;`
+	qrDeleteTag               = `DELETE FROM tag WHERE tag_id = $1;`
 	qrDeletePost              = `DELETE FROM post WHERE post_id = $1;`
 	qrDeletePostImageByPostID = `DELETE FROM post_image WHERE post_id = $1;`
 )
@@ -105,6 +106,7 @@ func (p *Post) GetPostsPage(storage *postgres.Storage, tags []string, page int, 
 	var ps []Post
 
 	var qrResult *sql.Rows
+
 	var err error
 	var postsAmount int
 
@@ -160,6 +162,7 @@ func (p *Post) GetPostsPage(storage *postgres.Storage, tags []string, page int, 
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
+		defer qrResult.Close()
 
 		// Fills Post struct for each post ID
 		for qrResult.Next() {
@@ -210,6 +213,7 @@ func (pi *PostImage) GetImagePathsByPostID(storage *postgres.Storage, postID int
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+	defer qrResult.Close()
 
 	var paths []string
 	for qrResult.Next() {
@@ -251,6 +255,17 @@ func (t *Tag) NewTag(storage *postgres.Storage, name, color string) error {
 	return nil
 }
 
+func (t *Tag) DeleteTag(storage *postgres.Storage, tagID int) error {
+	const op = "storage.postgres.entities.news.DeleteTag"
+
+	_, err := storage.DB.Exec(qrDeleteTag, tagID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
 func (t *Tag) GetTags(storage *postgres.Storage) ([]Tag, error) {
 	const op = "storage.postgres.entities.news.GetTags"
 
@@ -258,6 +273,7 @@ func (t *Tag) GetTags(storage *postgres.Storage) ([]Tag, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+	defer qrResult.Close()
 
 	tags := []Tag{}
 	for qrResult.Next() {
@@ -277,6 +293,7 @@ func (t *Tag) GetTagsByPostID(storage *postgres.Storage, postID int) ([]Tag, err
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+	defer qrResult.Close()
 
 	var tags []Tag
 	for qrResult.Next() {
@@ -378,10 +395,11 @@ func (c *Comment) GetCommentsByPostID(storage *postgres.Storage, postID int) ([]
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+	defer qrResult.Close()
 
 	var cs []Comment
 	for qrResult.Next() {
-		if err := qrResult.Scan(&c.CommentID, &c.UserID, &c.PostID, &c.Text, &c.CreationDate, &c.UpdateDate, &c.IsChecked); err != nil {
+		if err := qrResult.Scan(&c.CommentID, &c.UserID, &c.PostID, &c.Text, &c.CreationDate, &c.UpdateDate); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 		cs = append(cs, *c)
@@ -397,10 +415,11 @@ func (c *Comment) GetUncheckedComments(storage *postgres.Storage) ([]Comment, er
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+	defer qrResult.Close()
 
 	var cs []Comment
 	for qrResult.Next() {
-		if err := qrResult.Scan(&c.CommentID, &c.UserID, &c.PostID, &c.Text, &c.CreationDate, &c.UpdateDate, &c.IsChecked); err != nil {
+		if err := qrResult.Scan(&c.CommentID, &c.UserID, &c.PostID, &c.Text, &c.CreationDate, &c.UpdateDate); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 		cs = append(cs, *c)

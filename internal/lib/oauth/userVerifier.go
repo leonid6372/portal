@@ -2,21 +2,21 @@ package oauth
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"portal/internal/lib/logger/sl"
 	storageHandler "portal/internal/storage"
-	"portal/internal/storage/mssql"
+	ldapServer "portal/internal/storage/ldap"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/user"
 )
 
 // UserVerifier provides user credentials verifier for testing. Все методы этой структуры нужны для удовлетворения условиям NewBearerServer
 type UserVerifier struct {
-	Storage   *postgres.Storage
-	Storage1C *mssql.Storage
-	Log       *slog.Logger
+	Storage *postgres.Storage
+	//Storage1C  *mssql.Storage
+	LDAPServer *ldapServer.LDAPServer
+	Log        *slog.Logger
 }
 
 // ValidateUser validates username and password returning an error if the user credentials are wrong
@@ -24,14 +24,28 @@ func (uv *UserVerifier) ValidateUser(username, password string, r *http.Request)
 	const op = "lib.oauth.ValidateUser"
 	log := uv.Log.With(slog.String("op", op))
 
-	var u user.User
-	err := u.ValidateUser(uv.Storage, uv.Storage1C, username, password)
+	// Проверка пользователя через LDAP. Получаем DN пользваотеля для авторизации через него (проверка пароля), также получаем инфо о пользователе
+	userInfo, err := uv.LDAPServer.GetUserInfo(username)
+	if err != nil {
+		log.Error(op, "failed to get user info", sl.Err(err))
+		return 0, errors.New("failed to get user info: " + err.Error())
+	}
+	err = uv.LDAPServer.LDAPConn.Bind(userInfo[0], password)
+	if err != nil {
+		log.Error(op, "LDAP user validation error", sl.Err(err))
+		return 0, errors.New("LDAP user validation error: " + err.Error())
+	}
+
+	// Проверка пользователя по базе 1С
+	/*var u user.User
+	err = u.ValidateUser(uv.Storage, uv.Storage1C, username, password)
 	if err != nil {
 		log.Warn("user validation error", sl.Err(err))
 		return 0, errors.New("user validation error: " + err.Error())
-	}
+	}*/
 
 	// Get user id
+	var u user.User
 	err = u.GetUserID(uv.Storage, username)
 	if err != nil {
 		// Если ошибка не об отсутствии user_id, то выход по стнадартной ошибке БД
@@ -40,7 +54,7 @@ func (uv *UserVerifier) ValidateUser(username, password string, r *http.Request)
 			return 0, errors.New("token claims error: " + err.Error())
 		}
 		// Если ошибка выше была об отсутствии user_id, то создаем user_id для пользователя и получаем его в u.UserID
-		if err := u.NewUser(uv.Storage, username); err != nil {
+		if err := u.NewUser(uv.Storage, username, userInfo[1], userInfo[2], userInfo[3]); err != nil {
 			log.Error(op, "failed to create user in postgres", sl.Err(err))
 			return 0, errors.New("token claims error: " + err.Error())
 		}
@@ -53,7 +67,7 @@ func (uv *UserVerifier) ValidateUser(username, password string, r *http.Request)
 	}
 
 	log.Info("username " + username + " successfully validated")
-	fmt.Println(u.Role)
+
 	return u.Role, nil
 }
 
@@ -73,8 +87,14 @@ func (uv *UserVerifier) AddClaims(credential, tokenID string, scope int, r *http
 			log.Error(op, "failed to get user id", sl.Err(err))
 			return claims, errors.New("token claims error: " + err.Error())
 		}
+		// Проверка пользователя через LDAP. Получаем DN пользваотеля для авторизации через него (проверка пароля), также получаем инфо о пользователе
+		userInfo, err := uv.LDAPServer.GetUserInfo(credential)
+		if err != nil {
+			log.Error(op, "failed to get user info", sl.Err(err))
+			return claims, errors.New("failed to get user info: " + err.Error())
+		}
 		// Если ошибка выше была об отсутствии user_id, то создаем user_id для пользователя и получаем его в u.UserID
-		if err := u.NewUser(uv.Storage, credential); err != nil {
+		if err := u.NewUser(uv.Storage, credential, userInfo[1], userInfo[2], userInfo[3]); err != nil {
 			log.Error(op, "failed to create user in postgres", sl.Err(err))
 			return claims, errors.New("token claims error: " + err.Error())
 		}

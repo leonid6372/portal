@@ -19,7 +19,7 @@ import (
 )
 
 type Request struct {
-	CommentID int
+	CommentID int `json:"comment_id"`
 }
 
 type Response struct {
