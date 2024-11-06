@@ -124,7 +124,7 @@ func main() {
 	}
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil {
+		if err := srv.ListenAndServeTLS("/opt/corp-portal/certs/test_corp-portal.crt", "/opt/corp-portal/certs/test_corp-portal_unencrypted.key"); err != nil {
 			log.Error("failed to start server")
 		}
 	}()
@@ -193,7 +193,6 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 
 		r.Post("/api/tag", tag.New(log, storage))
 		r.Post("/api/delete_tag", tag.New(log, storage))
-		r.Get("/api/tags", tags.New(log, storage))
 	})
 
 	// Public API group
@@ -202,5 +201,6 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 
 		r.Get("/api/articles", articles.New(log, storage))
 		r.Get("/api/article", article.New(log, storage, storage1C))
+		r.Get("/api/tags", tags.New(log, storage))
 	})
 }

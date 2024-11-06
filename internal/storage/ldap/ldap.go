@@ -2,6 +2,7 @@ package ldapServer
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/go-ldap/ldap"
 )
@@ -27,15 +28,15 @@ func New(fqdn, baseDN, userAccountControl string) (*LDAPServer, error) {
 
 // Check user exists and get info in []string{userDN, name, position, department}
 func (ldapsrv *LDAPServer) GetUserInfo(username string) ([]string, error) {
-	const op = "storage.ldapServer.GetUserDN"
+	const op = "storage.ldapServer.GetUserInfo"
 
 	srvUsername, exists := os.LookupEnv("LDAP_USERNAME")
 	if !exists {
-		return "", fmt.Errorf("%s: username for LDAP does not exists in env", op)
+		return nil, fmt.Errorf("%s: username for LDAP does not exists in env", op)
 	}
 	srvPassword, exists := os.LookupEnv("LDAP_PASSWORD")
 	if !exists {
-		return "", fmt.Errorf("%s: password for LDAP does not exists in env", op)
+		return nil, fmt.Errorf("%s: password for LDAP does not exists in env", op)
 	}
 
 	err := ldapsrv.LDAPConn.Bind(srvUsername, srvPassword)
@@ -75,41 +76,80 @@ func (ldapsrv *LDAPServer) GetUserInfo(username string) ([]string, error) {
 		return nil, fmt.Errorf("%s: empty search result", op)
 	}
 
-	userInfo := []string{
-		result.Entries[0].DN,
-		result.Entries[0].GetAttributeValues("name")[0],
-		result.Entries[0].GetAttributeValues("title")[0],
-		result.Entries[0].GetAttributeValues("department")[0],
+	userInfo := []string{result.Entries[0].DN}
+
+	name := result.Entries[0].GetAttributeValues("name")
+	if len(name) != 0 {
+		userInfo = append(userInfo, name[0])
+	} else {
+		userInfo = append(userInfo, "")
+	}
+
+	title := result.Entries[0].GetAttributeValues("title")
+	if len(title) != 0 {
+		userInfo = append(userInfo, title[0])
+	} else {
+		userInfo = append(userInfo, "")
+	}
+
+	department := result.Entries[0].GetAttributeValues("department")
+	if len(department) != 0 {
+		userInfo = append(userInfo, department[0])
+	} else {
+		userInfo = append(userInfo, "")
 	}
 
 	return userInfo, nil
 }
 
-// Normal Bind and Search (TO DO: ERROR FORMAT)
-/*func (ldapsrv *LDAPServer) myBindAndSearch() (*ldap.SearchResult, error) {
-	const op = "storage.ldapServer.BindAndSearch"
+func (ldapsrv *LDAPServer) IsUserMemberOf(username, group string) (bool, error) {
+	const op = "storage.ldapServer.IsUserMemberOf"
 
-	ldapsrv.LDAPConn.Bind(BindUsername, BindPassword)
+	srvUsername, exists := os.LookupEnv("LDAP_USERNAME")
+	if !exists {
+		return false, fmt.Errorf("%s: username for LDAP does not exists in env", op)
+	}
+	srvPassword, exists := os.LookupEnv("LDAP_PASSWORD")
+	if !exists {
+		return false, fmt.Errorf("%s: password for LDAP does not exists in env", op)
+	}
+
+	err := ldapsrv.LDAPConn.Bind(srvUsername, srvPassword)
+	if err != nil && ldap.IsErrorWithCode(err, 200) {
+		ldapsrv.LDAPConn, err = ldap.DialURL(fmt.Sprintf("ldap://%s:389", ldapsrv.FQDN))
+		if err != nil {
+			return false, fmt.Errorf("%s: %w", op, err)
+		}
+	} else if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	filter := fmt.Sprintf("(&(sAMAccountName=%s)(memberof=CN=%s,CN=Users,%s))", username, group, ldapsrv.BaseDN)
 
 	searchReq := ldap.NewSearchRequest(
-		BaseDN,
-		ldap.ScopeWholeSubtree, //ldap.ScopeBaseObject, // you can also use ldap.ScopeWholeSubtree
+		ldapsrv.BaseDN,
+		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
 		0,
 		0,
 		false,
-		Filter,
-		[]string{"Name", "Title", "Department", "Mobile", "mail"},
+		filter,
+		[]string{},
 		nil,
 	)
 	result, err := ldapsrv.LDAPConn.Search(searchReq)
-	if err != nil {
-		return nil, fmt.Errorf("Search Error: %s", err)
+	if err != nil && ldap.IsErrorWithCode(err, 200) {
+		ldapsrv.LDAPConn, err = ldap.DialURL(fmt.Sprintf("ldap://%s:389", ldapsrv.FQDN))
+		if err != nil {
+			return false, fmt.Errorf("%s: %w", op, err)
+		}
+	} else if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
 	}
 
-	if len(result.Entries) > 0 {
-		return result, nil
-	} else {
-		return nil, fmt.Errorf("Couldn't fetch search entries")
+	if len(result.Entries) == 0 {
+		return false, nil
 	}
-}*/
+
+	return true, nil
+}

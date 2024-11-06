@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	qrNewUser                   = `INSERT INTO "user" (role, balance, username, full_name, position, department) VALUES (50, 0, $1, $2, $3, $4) RETURNING user_id, role;`
+	qrNewUser                   = `INSERT INTO "user" (role, balance, username, full_name, position, department) VALUES ($5, 0, $1, $2, $3, $4) RETURNING user_id;`
 	qrGetUserFullName           = `SELECT _Fld7254 FROM [10295].[dbo].[_InfoRg7251] WHERE _Fld7252 = $1;`
 	qrGetUserInfo               = `SELECT full_name, position, department FROM "user" WHERE username = $1;`
 	qrGetRole                   = `SELECT "role" FROM "user" WHERE username = $1;`
@@ -34,10 +34,10 @@ type User struct {
 	Role       int    `json:"role,omitempty"`
 }
 
-func (u *User) NewUser(storage *postgres.Storage, username, fullName, position, department string) error {
+func (u *User) NewUser(storage *postgres.Storage, username, fullName, position, department string, role int) error {
 	const op = "storage.postgres.entities.user.NewUser"
 
-	err := storage.DB.QueryRow(qrNewUser, username, fullName, position, department).Scan(&u.UserID, &u.Role)
+	err := storage.DB.QueryRow(qrNewUser, username, fullName, position, department, role).Scan(&u.UserID)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
