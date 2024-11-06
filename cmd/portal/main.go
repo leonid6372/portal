@@ -124,7 +124,7 @@ func main() {
 	}
 
 	go func() {
-		if err := srv.ListenAndServeTLS("/opt/corp-portal/certs/test_corp-portal.crt", "/opt/corp-portal/certs/test_corp-portal_unencrypted.key"); err != nil {
+		if err := srv.ListenAndServeTLS(cfg.HTTPServer.SecCertPath, cfg.HTTPServer.SecKeyPath); err != nil {
 			log.Error("failed to start server")
 		}
 	}()

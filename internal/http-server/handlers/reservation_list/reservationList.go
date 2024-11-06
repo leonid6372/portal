@@ -49,7 +49,7 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		// Определяем разрешенные роли
+		// Определяем запрещенные роли
 		restrictedRoles := []int{roles.UserWithOutReservation}
 
 		// Получаем user role из токена авторизации
