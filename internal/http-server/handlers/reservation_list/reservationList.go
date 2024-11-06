@@ -7,6 +7,8 @@ import (
 	"portal/internal/storage/postgres"
 	reservation "portal/internal/storage/postgres/entities/reservation"
 	"portal/internal/storage/postgres/entities/user"
+	"portal/internal/structs/roles"
+	"slices"
 	"strconv"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
+	"portal/internal/lib/oauth"
 )
 
 type Request struct {
@@ -45,6 +48,26 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
+
+		// Определяем запрещенные роли
+		restrictedRoles := []int{roles.UserWithOutReservation}
+
+		// Получаем user role из токена авторизации
+		role := r.Context().Value(oauth.ScopeContext).(int)
+		if role == 0 {
+			log.Error("no user role in token")
+			w.WriteHeader(500)
+			render.JSON(w, r, resp.Error("no user role in token"))
+			return
+		}
+
+		//  Проверяем доступно ли действие для роли текущего пользователя
+		if slices.Contains(restrictedRoles, role) {
+			log.Error("access was denied")
+			w.WriteHeader(403)
+			render.JSON(w, r, resp.Error("access was denied"))
+			return
+		}
 
 		var req Request
 

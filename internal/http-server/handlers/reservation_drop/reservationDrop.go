@@ -7,8 +7,11 @@ import (
 	"net/http"
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
+	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/reservation"
+	"portal/internal/structs/roles"
+	"slices"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
@@ -31,6 +34,26 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
+
+		// Определяем запрещенные роли
+		restrictedRoles := []int{roles.UserWithOutReservation}
+
+		// Получаем user role из токена авторизации
+		role := r.Context().Value(oauth.ScopeContext).(int)
+		if role == 0 {
+			log.Error("no user role in token")
+			w.WriteHeader(500)
+			render.JSON(w, r, resp.Error("no user role in token"))
+			return
+		}
+
+		//  Проверяем доступно ли действие для роли текущего пользователя
+		if slices.Contains(restrictedRoles, role) {
+			log.Error("access was denied")
+			w.WriteHeader(403)
+			render.JSON(w, r, resp.Error("access was denied"))
+			return
+		}
 
 		var req Request
 

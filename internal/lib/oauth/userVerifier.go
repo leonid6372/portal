@@ -9,6 +9,7 @@ import (
 	ldapServer "portal/internal/storage/ldap"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/user"
+	"portal/internal/structs/roles"
 )
 
 // UserVerifier provides user credentials verifier for testing. Все методы этой структуры нужны для удовлетворения условиям NewBearerServer
@@ -46,6 +47,7 @@ func (uv *UserVerifier) ValidateUser(username, password string, r *http.Request)
 
 	// Get user id
 	var u user.User
+	u.Role = roles.User
 	err = u.GetUserID(uv.Storage, username)
 	if err != nil {
 		// Если ошибка не об отсутствии user_id, то выход по стнадартной ошибке БД
@@ -53,8 +55,16 @@ func (uv *UserVerifier) ValidateUser(username, password string, r *http.Request)
 			log.Error(op, "failed to get user id", sl.Err(err))
 			return 0, errors.New("token claims error: " + err.Error())
 		}
+		isMemberOfGroup, err := uv.LDAPServer.IsUserMemberOf(username, "KD Heads employees and specialists")
+		if err != nil {
+			log.Error(op, "failed to check is user member of group", sl.Err(err))
+			return 0, errors.New("token claims error: " + err.Error())
+		}
+		if !isMemberOfGroup {
+			u.Role = roles.UserWithOutReservation
+		}
 		// Если ошибка выше была об отсутствии user_id, то создаем user_id для пользователя и получаем его в u.UserID
-		if err := u.NewUser(uv.Storage, username, userInfo[1], userInfo[2], userInfo[3]); err != nil {
+		if err := u.NewUser(uv.Storage, username, userInfo[1], userInfo[2], userInfo[3], u.Role); err != nil {
 			log.Error(op, "failed to create user in postgres", sl.Err(err))
 			return 0, errors.New("token claims error: " + err.Error())
 		}
@@ -80,6 +90,7 @@ func (uv *UserVerifier) AddClaims(credential, tokenID string, scope int, r *http
 
 	// Get user id
 	var u user.User
+	u.Role = roles.User
 	err := u.GetUserID(uv.Storage, credential)
 	if err != nil {
 		// Если ошибка не об отсутствии user_id, то выход по стнадартной ошибке БД
@@ -93,8 +104,16 @@ func (uv *UserVerifier) AddClaims(credential, tokenID string, scope int, r *http
 			log.Error(op, "failed to get user info", sl.Err(err))
 			return claims, errors.New("failed to get user info: " + err.Error())
 		}
+		isMemberOfGroup, err := uv.LDAPServer.IsUserMemberOf(credential, "KD Heads employees and specialists")
+		if err != nil {
+			log.Error(op, "failed to check is user member of group", sl.Err(err))
+			return claims, errors.New("token claims error: " + err.Error())
+		}
+		if !isMemberOfGroup {
+			u.Role = roles.UserWithOutReservation
+		}
 		// Если ошибка выше была об отсутствии user_id, то создаем user_id для пользователя и получаем его в u.UserID
-		if err := u.NewUser(uv.Storage, credential, userInfo[1], userInfo[2], userInfo[3]); err != nil {
+		if err := u.NewUser(uv.Storage, credential, userInfo[1], userInfo[2], userInfo[3], u.Role); err != nil {
 			log.Error(op, "failed to create user in postgres", sl.Err(err))
 			return claims, errors.New("token claims error: " + err.Error())
 		}

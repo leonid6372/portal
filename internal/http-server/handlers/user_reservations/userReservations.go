@@ -8,6 +8,8 @@ import (
 	"portal/internal/lib/logger/sl"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/reservation"
+	"portal/internal/structs/roles"
+	"slices"
 
 	"portal/internal/lib/oauth"
 
@@ -33,6 +35,26 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
+
+		// Определяем запрещенные роли
+		restrictedRoles := []int{roles.UserWithOutReservation}
+
+		// Получаем user role из токена авторизации
+		role := r.Context().Value(oauth.ScopeContext).(int)
+		if role == 0 {
+			log.Error("no user role in token")
+			w.WriteHeader(500)
+			render.JSON(w, r, resp.Error("no user role in token"))
+			return
+		}
+
+		//  Проверяем доступно ли действие для роли текущего пользователя
+		if slices.Contains(restrictedRoles, role) {
+			log.Error("access was denied")
+			w.WriteHeader(403)
+			render.JSON(w, r, resp.Error("access was denied"))
+			return
+		}
 
 		// Получаем userID из токена авторизации
 		tempUserID := r.Context().Value(oauth.ClaimsContext).(map[string]int)
