@@ -10,24 +10,28 @@ import (
 
 const (
 	// COALESCE() устанавливает значение update_date равное creation_date, если первое равно null, т.к. нельзя считать null в *time.Time
-	qrGetPostsPage            = `SELECT post_id, title, "text", creation_date, COALESCE(update_date, creation_date) AS update_date FROM post WHERE $1 < creation_date AND creation_date < $2 ORDER BY creation_date DESC LIMIT $3 OFFSET $4;`
+	qrGetPostsPage            = `SELECT post_id, title, "text", views, creation_date, COALESCE(update_date, creation_date) AS update_date FROM post WHERE $1 < creation_date AND creation_date < $2 ORDER BY creation_date DESC LIMIT $3 OFFSET $4;`
 	qrGetPostsIDByDateFilter  = `SELECT post_id FROM post WHERE $1 < creation_date AND creation_date < $2`
-	qrGetPostByID             = `SELECT title, "text", creation_date, COALESCE(update_date, creation_date) AS update_date FROM post WHERE post_id = $1;`
+	qrGetPostByID             = `SELECT title, "text", views, creation_date, COALESCE(update_date, creation_date) AS update_date FROM post WHERE post_id = $1;`
 	qrGetPostsAmount          = `SELECT count(post_id) FROM post;`
 	qrGetPostText             = `SELECT "text" FROM post WHERE post_id = $1;`
 	qrGetCommentsByPostID     = `SELECT comment_id, user_id, post_id, text, creation_date, COALESCE(update_date, creation_date) AS update_date FROM comment WHERE post_id = $1 AND is_checked = TRUE;`
 	qrGetUncheckedComments    = `SELECT comment_id, user_id, post_id, text, creation_date, COALESCE(update_date, creation_date) AS update_date FROM comment WHERE is_checked = FALSE;`
+	qrGetCommentsAmount       = `SELECT count(comment_id) FROM comment WHERE post_id = $1 AND is_checked = TRUE;`
+	qrGetIsLikedByUserID      = `SELECT * FROM "like" WHERE post_id = $1 AND user_id = $2;`
 	qrUpdatePost              = `UPDATE post SET title = $1, "text" = $2, update_date = CURRENT_TIMESTAMP WHERE post_id = $3;`
+	qrUpdateTag               = `UPDATE tag SET "name" = $1, background_color = $2, text_color = $3 WHERE tag_id = $4;`
 	qrUpdateCommentText       = `UPDATE comment SET "text" = $1, update_date = CURRENT_TIMESTAMP, is_checked = FALSE WHERE comment_id = $2;`
 	qrUpdateCommentIsChecked  = `UPDATE comment SET is_checked = TRUE WHERE comment_id = $1;`
+	qrUpdateViews             = `UPDATE post SET views = views + 1 WHERE post_id = $1;`
 	qrGetLikesAmountByPostID  = `SELECT likes_amount FROM likes_amount WHERE post_id = $1;`
-	qrGetImagePathsByPostID   = `SELECT "path" FROM post_image WHERE post_id = $1;`
-	qrGetTagsByPostID         = `SELECT tag_id, "name", color FROM post_tags WHERE post_id = $1;`
-	qrGetTags                 = `SELECT * FROM tag;`
-	qrNewTag                  = `INSERT INTO tag("name", color) VALUES ($1, $2);`
+	qrGetImageNamesByPostID   = `SELECT "path" FROM post_image WHERE post_id = $1;`
+	qrGetTagsByPostID         = `SELECT tag_id, "name", background_color, text_color FROM post_tags WHERE post_id = $1;`
+	qrGetTags                 = `SELECT tag_id, "name", background_color, text_color FROM tag;`
+	qrNewTag                  = `INSERT INTO tag("name", background_color, text_color) VALUES ($1, $2, $3);`
 	qrNewLike                 = `INSERT INTO "like"(user_id, post_id) VALUES ($1, $2);`
 	qrNewComment              = `INSERT INTO "comment"(user_id, post_id, "text", creation_date, is_checked) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, FALSE);`
-	qrNewPost                 = `INSERT INTO post(title, "text", creation_date, update_date) VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING post_id;`
+	qrNewPost                 = `INSERT INTO post(title, "text", creation_date, update_date, views) VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0) RETURNING post_id;`
 	qrNewPostImage            = `INSERT INTO post_image(post_id, "path") VALUES ($1, $2);`
 	qrNewInPostTag            = `INSERT INTO in_post_tag(post_id, tag_id) VALUES ($1, $2);`
 	qrDeleteInPostTagByPostID = `DELETE FROM in_post_tag WHERE post_id = $1;`
@@ -38,7 +42,7 @@ const (
 )
 
 const (
-	postsPerPage = 15 // количество записей на странице
+	postsPerPage = 100000 // количество записей на странице
 )
 
 type Post struct {
@@ -47,6 +51,7 @@ type Post struct {
 	Text         string    `json:"text,omitempty"`
 	CreationDate time.Time `json:"creation_date,omitempty"`
 	UpdateDate   time.Time `json:"update_date,omitempty"`
+	Views        int       `json:"views"`
 }
 
 // Also set created post id value to p.PostID
@@ -94,13 +99,24 @@ func (p *Post) DeletePost(storage *postgres.Storage, postID int) error {
 	return nil
 }
 
+func (p *Post) AddView(storage *postgres.Storage, postID int) error {
+	const op = "storage.postgres.entities.news.AddView"
+
+	_, err := storage.DB.Exec(qrUpdateViews, postID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
 type PostsPage struct {
 	Posts      []Post     `json:"posts,omitempty"`
 	Pagination Pagination `json:"pagination,omitempty"`
 }
 
 // Return slice of Article structs with empty values of Images and Tags
-func (p *Post) GetPostsPage(storage *postgres.Storage, tags []string, page int, createdAfter, createdBefore time.Time) ([]Post, error) {
+func (p *Post) GetPostsPage(storage *postgres.Storage, tagsID []string, page int, createdAfter, createdBefore time.Time) ([]Post, error) {
 	const op = "storage.postgres.entities.news.GetPostsPage"
 
 	var ps []Post
@@ -122,13 +138,13 @@ func (p *Post) GetPostsPage(storage *postgres.Storage, tags []string, page int, 
 
 	// If there are no tags, get posts without filter
 	// Else get posts with filter
-	if len(tags) == 0 {
+	if len(tagsID) == 0 {
 		qrResult, err = storage.DB.Query(qrGetPostsPage, createdAfter, createdBefore, limit, offset)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 		for qrResult.Next() {
-			if err := qrResult.Scan(&p.PostID, &p.Title, &p.Text, &p.CreationDate, &p.UpdateDate); err != nil {
+			if err := qrResult.Scan(&p.PostID, &p.Title, &p.Text, &p.Views, &p.CreationDate, &p.UpdateDate); err != nil {
 				return nil, fmt.Errorf("%s: %w", op, err)
 			}
 			ps = append(ps, *p)
@@ -141,13 +157,13 @@ func (p *Post) GetPostsPage(storage *postgres.Storage, tags []string, page int, 
 	} else {
 		// Build SQL query with filter
 		qrGetPostIDsByTags := `SELECT post_id FROM post_tags WHERE post_id IN(` + qrGetPostsIDByDateFilter + `) AND `
-		for i, tag := range tags {
+		for i, tagID := range tagsID {
 			if i > 0 {
 				qrGetPostIDsByTags += ` OR `
 			}
-			qrGetPostIDsByTags += ` "name" = '` + tag + `' `
+			qrGetPostIDsByTags += ` "tag_id" = '` + tagID + `' `
 		}
-		qrGetPostIDsByTags += ` GROUP BY post_id HAVING COUNT(post_id) >= ` + strconv.Itoa(len(tags))
+		qrGetPostIDsByTags += ` GROUP BY post_id HAVING COUNT(post_id) >= ` + strconv.Itoa(len(tagsID))
 
 		// Count posts amount to make MaxPage in pagination
 		qrGetPostsWithTagsAmount := `SELECT COUNT(post_id) FROM ( `
@@ -169,7 +185,7 @@ func (p *Post) GetPostsPage(storage *postgres.Storage, tags []string, page int, 
 			if err := qrResult.Scan(&p.PostID); err != nil {
 				return nil, fmt.Errorf("%s: %w", op, err)
 			}
-			if err := storage.DB.QueryRow(qrGetPostByID, p.PostID).Scan(&p.Title, &p.Text, &p.CreationDate, &p.UpdateDate); err != nil {
+			if err := storage.DB.QueryRow(qrGetPostByID, p.PostID).Scan(&p.Title, &p.Text, &p.Views, &p.CreationDate, &p.UpdateDate); err != nil {
 				return nil, fmt.Errorf("%s: %w", op, err)
 			}
 			ps = append(ps, *p)
@@ -195,10 +211,10 @@ type PostImage struct {
 	Path        string `json:"path,omitempty"`
 }
 
-func (pi *PostImage) NewPostImage(storage *postgres.Storage, postID int, path string) error {
+func (pi *PostImage) NewPostImage(storage *postgres.Storage, postID int, minioName string) error {
 	const op = "storage.postgres.entities.news.NewPostImage"
 
-	_, err := storage.DB.Exec(qrNewPostImage, postID, path)
+	_, err := storage.DB.Exec(qrNewPostImage, postID, fmt.Sprintf("https://corp-portal.kama-diesel.ru/api/image?name=%s", minioName))
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -206,10 +222,10 @@ func (pi *PostImage) NewPostImage(storage *postgres.Storage, postID int, path st
 	return nil
 }
 
-func (pi *PostImage) GetImagePathsByPostID(storage *postgres.Storage, postID int) ([]string, error) {
+func (pi *PostImage) GetImageInfoByPostID(storage *postgres.Storage, postID int) ([]string, error) {
 	const op = "storage.postgres.entities.news.GetImagePathsByPostID"
 
-	qrResult, err := storage.DB.Query(qrGetImagePathsByPostID, postID)
+	qrResult, err := storage.DB.Query(qrGetImageNamesByPostID, postID)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
@@ -239,15 +255,27 @@ func (pi *PostImage) DeletePostImageByPostID(storage *postgres.Storage, postID i
 }
 
 type Tag struct {
-	TagID int    `json:"tag_id,omitempty"`
-	Name  string `json:"name,omitempty"`
-	Color string `json:"color,omitempty"`
+	TagID           int    `json:"tag_id,omitempty"`
+	Name            string `json:"name,omitempty"`
+	BackgroundColor string `json:"background_color,omitempty"`
+	TextColor       string `json:"text_color,omitempty"`
 }
 
-func (t *Tag) NewTag(storage *postgres.Storage, name, color string) error {
+func (t *Tag) NewTag(storage *postgres.Storage, name, backgroundColor, textColor string) error {
 	const op = "storage.postgres.entities.news.NewTag"
 
-	_, err := storage.DB.Exec(qrNewTag, name, color)
+	_, err := storage.DB.Exec(qrNewTag, name, backgroundColor, textColor)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (t *Tag) UpdateTag(storage *postgres.Storage, tagID int, name, backgroundColor, textColor string) error {
+	const op = "storage.postgres.entities.news.UpdateTag"
+
+	_, err := storage.DB.Exec(qrUpdateTag, name, backgroundColor, textColor, tagID)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -277,7 +305,7 @@ func (t *Tag) GetTags(storage *postgres.Storage) ([]Tag, error) {
 
 	tags := []Tag{}
 	for qrResult.Next() {
-		if err := qrResult.Scan(&t.TagID, &t.Name, &t.Color); err != nil {
+		if err := qrResult.Scan(&t.TagID, &t.Name, &t.BackgroundColor, &t.TextColor); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 		tags = append(tags, *t)
@@ -297,7 +325,7 @@ func (t *Tag) GetTagsByPostID(storage *postgres.Storage, postID int) ([]Tag, err
 
 	var tags []Tag
 	for qrResult.Next() {
-		if err := qrResult.Scan(&t.TagID, &t.Name, &t.Color); err != nil {
+		if err := qrResult.Scan(&t.TagID, &t.Name, &t.BackgroundColor, &t.TextColor); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 		tags = append(tags, *t)
@@ -367,6 +395,22 @@ func (l *Like) GetLikesAmount(storage *postgres.Storage, postID int) (int, error
 	return amount, nil
 }
 
+func (l *Like) IsLikedByUserID(storage *postgres.Storage, postID, userID int) (bool, error) {
+	const op = "storage.postgres.entities.news.IsLikedByUserID"
+
+	qrResult, err := storage.DB.Query(qrGetIsLikedByUserID, postID, userID)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	defer qrResult.Close()
+
+	if !qrResult.Next() {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 type Comment struct {
 	CommentID    int       `json:"comment_id,omitempty"`
 	UserID       int       `json:"user_id,omitempty"`
@@ -426,6 +470,18 @@ func (c *Comment) GetUncheckedComments(storage *postgres.Storage) ([]Comment, er
 	}
 
 	return cs, nil
+}
+
+func (c *Comment) GetCommentsAmount(storage *postgres.Storage, postID int) (int, error) {
+	const op = "storage.postgres.entities.news.GetCommentsAmount"
+
+	var amount int
+	err := storage.DB.QueryRow(qrGetCommentsAmount, postID).Scan(&amount)
+	if err != nil {
+		return -1, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return amount, nil
 }
 
 func (c *Comment) UpdateCommentText(storage *postgres.Storage, commentID int, text string) error {

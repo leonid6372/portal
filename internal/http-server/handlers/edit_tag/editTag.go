@@ -1,11 +1,10 @@
-package tag
+package editTag
 
 import (
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
-	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
@@ -13,12 +12,15 @@ import (
 	"portal/internal/structs/roles"
 	"slices"
 
+	resp "portal/internal/lib/api/response"
+
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 )
 
 type Request struct {
+	TagID           int     `json:"tag_id" validate:"required"`
 	Name            string  `json:"name" validate:"required"`
 	BackgroundColor string  `json:"background_color" validate:"required"`
 	TextColor       *string `json:"text_color"`
@@ -30,7 +32,7 @@ type Response struct {
 
 func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.Tag.New"
+		const op = "handlers.editComment.New"
 
 		log := log.With(
 			slog.String("op", op),
@@ -95,16 +97,17 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			}
 		}
 
-		// Создание и добавление тэга в БД
-		var t news.Tag
-		if err := t.NewTag(storage, req.Name, req.BackgroundColor, *req.TextColor); err != nil {
-			log.Error("failed to create new tag", sl.Err(err))
+		// Обновляем значение текста комментария в БД
+		var c news.Tag
+		err = c.UpdateTag(storage, req.TagID, req.Name, req.BackgroundColor, *req.TextColor)
+		if err != nil {
+			log.Error("failed to update tag", sl.Err(err))
 			w.WriteHeader(422)
-			render.JSON(w, r, resp.Error("failed to create new tag"))
+			render.JSON(w, r, resp.Error("failed to update tag"))
 			return
 		}
 
-		log.Info("tag was successfully created")
+		log.Info("tag successfully updated")
 
 		render.JSON(w, r, resp.OK())
 	}

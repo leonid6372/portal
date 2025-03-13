@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
-	"portal/internal/storage/mssql"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/news"
 	"portal/internal/storage/postgres/entities/user"
@@ -31,7 +30,7 @@ type Response struct {
 	Comments []CommentInfo `json:"comments"`
 }
 
-func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) http.HandlerFunc {
+func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.checkComments.New"
 

@@ -8,15 +8,17 @@ import (
 	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
 	"portal/internal/storage/postgres"
+	"portal/internal/storage/postgres/entities/user"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
 )
 
 type User struct {
-	UserID   int    `json:"user_id"`
-	Username string `json:"username"`
-	Role     int    `json:"role"`
+	UserID    int    `json:"user_id"`
+	Username  string `json:"username"`
+	Role      int    `json:"role"`
+	ImagePath string `json:"image_path"`
 }
 
 type Response struct {
@@ -61,7 +63,17 @@ func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
-		user := User{UserID: userID, Username: username, Role: userRole}
+		// Получаем путь фото пользователя из БД
+		var u user.User
+		err := u.GetImagePath(storage, userID)
+		if err != nil {
+			log.Error("failed to get image path", sl.Err(err))
+			w.WriteHeader(422)
+			render.JSON(w, r, resp.Error("failed to get image path"))
+			return
+		}
+
+		user := User{UserID: userID, Username: username, Role: userRole, ImagePath: u.ImagePath}
 
 		responseOK(w, r, log, user)
 	}

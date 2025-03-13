@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"portal/internal/lib/logger/sl"
-	"portal/internal/storage/mssql"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/news"
 	"portal/internal/storage/postgres/entities/user"
@@ -19,6 +18,7 @@ import (
 
 type Request struct {
 	PostID int
+	UserID int
 }
 
 type CommentInfo struct {
@@ -26,6 +26,7 @@ type CommentInfo struct {
 	FullName   string `json:"full_name"`
 	Position   string `json:"position"`
 	Department string `json:"department"`
+	ImagePath  string `json:"image_path"`
 }
 
 type Article struct {
@@ -38,7 +39,7 @@ type Response struct {
 	Article Article `json:"article"`
 }
 
-func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) http.HandlerFunc {
+func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.article.New"
 
@@ -107,11 +108,27 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 				render.JSON(w, r, resp.Error("failed to get user info"))
 				return
 			}
+			err = u.GetImagePath(storage, ci.UserID)
+			if err != nil {
+				log.Error("failed to get user info", sl.Err(err))
+				w.WriteHeader(422)
+				render.JSON(w, r, resp.Error("failed to get user info"))
+				return
+			}
 
 			ci.FullName = u.FullName
 			ci.Position = u.Position
 			ci.Department = u.Department
+			ci.ImagePath = u.ImagePath
 			csi = append(csi, ci)
+		}
+
+		// Добавляем просмотр посту в p по ID поста
+		if err := p.AddView(storage, req.PostID); err != nil {
+			log.Error("failed to add post view", sl.Err(err))
+			w.WriteHeader(422)
+			render.JSON(w, r, resp.Error("failed to add post view"))
+			return
 		}
 
 		article := Article{

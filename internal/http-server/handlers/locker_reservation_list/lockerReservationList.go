@@ -3,7 +3,6 @@ package lockerReservationList
 import (
 	"encoding/json"
 	"net/http"
-	"portal/internal/storage/mssql"
 	"portal/internal/storage/postgres"
 	reservation "portal/internal/storage/postgres/entities/reservation"
 	"portal/internal/storage/postgres/entities/user"
@@ -36,7 +35,7 @@ type Response struct {
 	ActualLockers []ActualLockerInfo `json:"locker_reservation_list"`
 }
 
-func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) http.HandlerFunc {
+func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.lockerReservationList.New"
 

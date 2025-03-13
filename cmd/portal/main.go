@@ -18,10 +18,13 @@ import (
 	deleteComment "portal/internal/http-server/handlers/delete_comment"
 	deleteItem "portal/internal/http-server/handlers/delete_item"
 	deletePost "portal/internal/http-server/handlers/delete_post"
+	deleteTag "portal/internal/http-server/handlers/delete_tag"
 	dropCart "portal/internal/http-server/handlers/drop_cart"
 	dropCartItem "portal/internal/http-server/handlers/drop_cart_item"
 	editComment "portal/internal/http-server/handlers/edit_comment"
 	editPost "portal/internal/http-server/handlers/edit_post"
+	editTag "portal/internal/http-server/handlers/edit_tag"
+	"portal/internal/http-server/handlers/image"
 	"portal/internal/http-server/handlers/like"
 	lockerReservation "portal/internal/http-server/handlers/locker_reservation"
 	lockerReservationDrop "portal/internal/http-server/handlers/locker_reservation_drop"
@@ -29,6 +32,7 @@ import (
 	lockerReservationUpdate "portal/internal/http-server/handlers/locker_reservation_update"
 	"portal/internal/http-server/handlers/me"
 	"portal/internal/http-server/handlers/order"
+	phoneBook "portal/internal/http-server/handlers/phone_book"
 	profile "portal/internal/http-server/handlers/profile"
 	reservationHandler "portal/internal/http-server/handlers/reservation"
 	reservationDelete "portal/internal/http-server/handlers/reservation_delete"
@@ -42,12 +46,13 @@ import (
 	updateCartItem "portal/internal/http-server/handlers/update_cart_item"
 	userLockerReservations "portal/internal/http-server/handlers/user_locker_reservations"
 	userReservations "portal/internal/http-server/handlers/user_reservations"
+	vc "portal/internal/lib/views_counter"
 
 	setupLogger "portal/internal/lib/logger/setup_logger"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
 	ldapServer "portal/internal/storage/ldap"
-	"portal/internal/storage/mssql"
+	minioServer "portal/internal/storage/minio"
 	"portal/internal/storage/postgres"
 	"syscall"
 	"time"
@@ -74,7 +79,7 @@ func main() {
 	}()
 
 	// Подключение и закрытие базы MSSQL 1C
-	storage1C, err := mssql.New(cfg.SQL)
+	/*storage1C, err := mssql.New(cfg.SQL)
 	if err != nil {
 		log.Error("failed to init 1C storage", sl.Err(err))
 		os.Exit(1)
@@ -82,7 +87,7 @@ func main() {
 	defer func() {
 		storage1C.DB.Close()
 		log.Info("1C storage closed")
-	}()
+	}()*/
 
 	// Подключение и закрытие LDAP сервера
 	ldapsrv, err := ldapServer.New(cfg.LDAPServer.FQDN, cfg.LDAPServer.BaseDN, cfg.LDAPServer.UserAccountControl)
@@ -95,11 +100,25 @@ func main() {
 		log.Info("LDAP server closed")
 	}()
 
+	// Создание и подключение MinIO сервера
+	miniosrv, err := minioServer.New(cfg.MinIOServer.URL, cfg.MinIOServer.Bucket, false)
+	if err != nil {
+		log.Error("failed to init MinIO provider", sl.Err(err))
+		os.Exit(1)
+	}
+	err = miniosrv.Connect()
+	if err != nil {
+		log.Error("failed to connect to MinIO server", sl.Err(err))
+		os.Exit(1)
+	}
+
 	bearerServer := oauth.NewBearerServer(
 		cfg.BearerServer.Secret,
 		cfg.BearerServer.TokenTTL,
-		&oauth.UserVerifier{Storage: storage /*Storage1C: storage1C*/, LDAPServer: ldapsrv, Log: log},
+		&oauth.UserVerifier{Storage: storage, LDAPServer: ldapsrv, Log: log},
 		nil)
+
+	viewsCounter := vc.ViewsCounter{}
 
 	router := chi.NewRouter()
 
@@ -108,7 +127,7 @@ func main() {
 	router.Use(middleware.Recoverer) // Если где-то внутри сервера (обработчика запроса) произойдет паника, приложение не должно упасть
 	router.Use(middleware.URLFormat) // Парсер URLов поступающих запросов
 
-	routeAPI(router, log, bearerServer, cfg.BearerServer.Secret, storage, storage1C)
+	routeAPI(router, log, bearerServer, cfg.BearerServer.Secret, storage, miniosrv, &viewsCounter)
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 
@@ -124,8 +143,9 @@ func main() {
 	}
 
 	go func() {
-		if err := srv.ListenAndServeTLS(cfg.HTTPServer.SecCertPath, cfg.HTTPServer.SecKeyPath); err != nil {
+		if err := srv.ListenAndServeTLS(cfg.HTTPServer.SecCertPath, cfg.HTTPServer.SecKeyPath); err != nil && err != http.ErrServerClosed {
 			log.Error("failed to start server")
+			os.Exit(1)
 		}
 	}()
 
@@ -134,26 +154,33 @@ func main() {
 	<-done
 	log.Info("stopping server")
 
+	// Обновляем значение просмотров всего в базе данных
+	err = storage.IncreaseViews(viewsCounter.Count())
+	if err != nil {
+		log.Error("failed to update total views in postgres: " + err.Error())
+	} else {
+		log.Info("total views updates")
+	}
+
 	// TODO: move timeout to config
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Error("failed to stop server")
-
 		return
 	}
 
 	log.Info("server stopped")
 }
 
-func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServer, secret string, storage *postgres.Storage, storage1C *mssql.Storage) {
+func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServer, secret string, storage *postgres.Storage, miniosrv *minioServer.MinioProvider, viewsCounter *vc.ViewsCounter) {
 	//Secured API group
 	router.Group(func(r chi.Router) {
 		// use the Bearer Authentication middleware
 		r.Use(oauth.Authorize(secret, nil, bearerServer, log))
 		r.Post("/api/reservation", reservationHandler.New(log, storage))
-		r.Get("/api/reservation_list", reservationList.New(log, storage, storage1C))
+		r.Get("/api/reservation_list", reservationList.New(log, storage))
 		r.Get("/api/user_reservations", userReservations.New(log, storage))
 		r.Post("/api/reservation_update", reservationUpdate.New(log, storage))
 		r.Post("/api/reservation_drop", reservationDrop.New(log, storage))
@@ -162,13 +189,14 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 		r.Post("/api/reservation_edit", reservationEdit.New(log, storage))
 
 		r.Post("/api/locker_reservation", lockerReservation.New(log, storage))
-		r.Get("/api/locker_reservation_list", lockerReservationList.New(log, storage, storage1C))
+		r.Get("/api/locker_reservation_list", lockerReservationList.New(log, storage))
 		r.Get("/api/user_locker_reservations", userLockerReservations.New(log, storage))
 		r.Post("/api/locker_reservation_update", lockerReservationUpdate.New(log, storage))
 		r.Post("/api/locker_reservation_drop", lockerReservationDrop.New(log, storage))
 
-		r.Get("/api/profile", profile.New(log, storage, storage1C))
+		r.Get("/api/profile", profile.New(log, storage))
 		r.Get("/api/me", me.New(log, storage))
+		r.Get("/api/phone_book", phoneBook.New(log, storage))
 
 		r.Get("/api/shop_list", shopList.New(log, storage))
 		r.Post("/api/add_cart_item", addCartItem.New(log, storage))
@@ -181,26 +209,28 @@ func routeAPI(router *chi.Mux, log *slog.Logger, bearerServer *oauth.BearerServe
 
 		r.Post("/api/comment", comment.New(log, storage))
 		r.Post("/api/edit_comment", editComment.New(log, storage))
-		r.Get("/api/check_comments", checkComments.New(log, storage, storage1C))
+		r.Get("/api/check_comments", checkComments.New(log, storage))
 		r.Post("/api/approve_comment", approveComment.New(log, storage))
 		r.Post("/api/delete_comment", deleteComment.New(log, storage))
 
 		r.Post("/api/like", like.New(log, storage))
 
-		r.Post("/api/create_article", createPost.New(log, storage))
-		r.Post("/api/edit_article", editPost.New(log, storage))
-		r.Post("/api/delete_article", deletePost.New(log, storage))
+		r.Post("/api/create_article", createPost.New(log, storage, miniosrv))
+		r.Post("/api/edit_article", editPost.New(log, storage, miniosrv))
+		r.Post("/api/delete_article", deletePost.New(log, storage, miniosrv))
 
 		r.Post("/api/tag", tag.New(log, storage))
-		r.Post("/api/delete_tag", tag.New(log, storage))
+		r.Post("/api/edit_tag", editTag.New(log, storage))
+		r.Post("/api/delete_tag", deleteTag.New(log, storage))
 	})
 
 	// Public API group
 	router.Group(func(r chi.Router) {
 		r.Post("/api/login", bearerServer.UserCredentials)
 
-		r.Get("/api/articles", articles.New(log, storage))
-		r.Get("/api/article", article.New(log, storage, storage1C))
+		r.Get("/api/articles", articles.New(log, storage, viewsCounter))
+		r.Get("/api/image", image.New(log, miniosrv))
+		r.Get("/api/article", article.New(log, storage))
 		r.Get("/api/tags", tags.New(log, storage))
 	})
 }

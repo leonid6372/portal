@@ -8,6 +8,7 @@ import (
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
+	minioServer "portal/internal/storage/minio"
 	"portal/internal/storage/postgres"
 	"portal/internal/storage/postgres/entities/news"
 	"portal/internal/structs/roles"
@@ -26,7 +27,7 @@ type Response struct {
 	resp.Response
 }
 
-func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
+func New(log *slog.Logger, storage *postgres.Storage, miniosrv *minioServer.MinioProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.deleteArticle.New"
 

@@ -1,12 +1,16 @@
 CREATE TABLE "user"(
 	user_id SERIAL PRIMARY KEY,
-	name varchar(150),
+	full_name varchar(150),
 	position varchar(150),
 	department varchar(150),
 	balance INT,
 	"role" INT NOT NULL,
 	"password" varchar(50),
-	username varchar(50) UNIQUE
+	username varchar(50) UNIQUE,
+	mobile varchar(25),
+	mail varchar(150),
+	chief text,
+	image_path text
 );
 
 CREATE TABLE item(
@@ -102,7 +106,8 @@ CREATE TABLE post_image(
 CREATE TABLE tag(
 	tag_id SERIAL PRIMARY KEY,
 	"name" varchar(50) UNIQUE NOT NULL,
-	color varchar(16) UNIQUE NOT NULL
+	background_color varchar(16) UNIQUE NOT NULL,
+	text_color text
 );
 
 CREATE TABLE in_post_tag(

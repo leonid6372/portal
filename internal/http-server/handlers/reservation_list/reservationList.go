@@ -3,12 +3,9 @@ package reservationList
 import (
 	"encoding/json"
 	"net/http"
-	"portal/internal/storage/mssql"
 	"portal/internal/storage/postgres"
 	reservation "portal/internal/storage/postgres/entities/reservation"
 	"portal/internal/storage/postgres/entities/user"
-	"portal/internal/structs/roles"
-	"slices"
 	"strconv"
 	"time"
 
@@ -19,7 +16,6 @@ import (
 
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
-	"portal/internal/lib/oauth"
 )
 
 type Request struct {
@@ -33,6 +29,8 @@ type ActualPlaceInfo struct {
 	FullName   string `json:"full_name"`
 	Position   string `json:"position"`
 	Department string `json:"department"`
+	Mail       string `json:"mail"`
+	Mobile     string `json:"mobile"`
 }
 
 type Response struct {
@@ -40,7 +38,7 @@ type Response struct {
 	ActualPlaces []ActualPlaceInfo `json:"reservation_list"`
 }
 
-func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) http.HandlerFunc {
+func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.reservationList.New"
 
@@ -48,26 +46,6 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
-
-		// Определяем запрещенные роли
-		restrictedRoles := []int{roles.UserWithOutReservation}
-
-		// Получаем user role из токена авторизации
-		role := r.Context().Value(oauth.ScopeContext).(int)
-		if role == 0 {
-			log.Error("no user role in token")
-			w.WriteHeader(500)
-			render.JSON(w, r, resp.Error("no user role in token"))
-			return
-		}
-
-		//  Проверяем доступно ли действие для роли текущего пользователя
-		if slices.Contains(restrictedRoles, role) {
-			log.Error("access was denied")
-			w.WriteHeader(403)
-			render.JSON(w, r, resp.Error("access was denied"))
-			return
-		}
 
 		var req Request
 
@@ -141,6 +119,8 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 				api.FullName = u.FullName
 				api.Position = u.Position
 				api.Department = u.Department
+				api.Mail = u.Mail
+				api.Mobile = u.Mobile
 			}
 			apsi = append(apsi, api)
 		}

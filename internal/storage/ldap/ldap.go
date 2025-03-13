@@ -26,7 +26,7 @@ func New(fqdn, baseDN, userAccountControl string) (*LDAPServer, error) {
 	return &LDAPServer{LDAPConn: ldapConn, FQDN: fqdn, BaseDN: baseDN, UserAccountControl: userAccountControl}, nil
 }
 
-// Check user exists and get info in []string{userDN, name, position, department}
+// Check user exists and get info in []string{userDN, name, position, department, mobile, mail}
 func (ldapsrv *LDAPServer) GetUserInfo(username string) ([]string, error) {
 	const op = "storage.ldapServer.GetUserInfo"
 
@@ -95,6 +95,20 @@ func (ldapsrv *LDAPServer) GetUserInfo(username string) ([]string, error) {
 	department := result.Entries[0].GetAttributeValues("department")
 	if len(department) != 0 {
 		userInfo = append(userInfo, department[0])
+	} else {
+		userInfo = append(userInfo, "")
+	}
+
+	mobile := result.Entries[0].GetAttributeValues("Mobile")
+	if len(mobile) != 0 {
+		userInfo = append(userInfo, mobile[0])
+	} else {
+		userInfo = append(userInfo, "")
+	}
+
+	mail := result.Entries[0].GetAttributeValues("mail")
+	if len(mail) != 0 {
+		userInfo = append(userInfo, mail[0])
 	} else {
 		userInfo = append(userInfo, "")
 	}

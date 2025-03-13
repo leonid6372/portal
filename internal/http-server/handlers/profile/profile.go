@@ -15,7 +15,6 @@ import (
 	resp "portal/internal/lib/api/response"
 	"portal/internal/lib/logger/sl"
 	"portal/internal/lib/oauth"
-	"portal/internal/storage/mssql"
 )
 
 // Временная вспомогательная структура
@@ -24,7 +23,9 @@ type Profile struct {
 	FullName   string `json:"full_name"`
 	Position   string `json:"position"`
 	Department string `json:"department"`
-	//Birthday   string `json:"birthday"`
+	Mail       string `json:"mail"`
+	Mobile     string `json:"mobile"`
+	Chief      string `json:"chief"`
 }
 
 type Response struct {
@@ -32,7 +33,7 @@ type Response struct {
 	Profile Profile `json:"profile"`
 }
 
-func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) http.HandlerFunc {
+func New(log *slog.Logger, storage *postgres.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.profile.New"
 
@@ -89,7 +90,7 @@ func New(log *slog.Logger, storage *postgres.Storage, storage1C *mssql.Storage) 
 
 		log.Info("profile data successfully gotten")
 
-		responseOK(w, r, log, Profile{Username: u.Username, FullName: u.FullName, Position: u.Position, Department: u.Department})
+		responseOK(w, r, log, Profile{Username: u.Username, FullName: u.FullName, Position: u.Position, Department: u.Department, Mail: u.Mail, Mobile: u.Mobile, Chief: u.Chief})
 	}
 }
 

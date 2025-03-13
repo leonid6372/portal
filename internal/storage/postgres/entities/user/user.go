@@ -8,14 +8,16 @@ import (
 )
 
 const (
-	qrNewUser                   = `INSERT INTO "user" (role, balance, username, full_name, position, department) VALUES ($5, 0, $1, $2, $3, $4) RETURNING user_id;`
+	qrNewUser                   = `INSERT INTO "user" (role, balance, username, full_name, position, department, mobile, mail) VALUES ($7, 0, $1, $2, $3, $4, $5, $6) RETURNING user_id;`
 	qrGetUserFullName           = `SELECT _Fld7254 FROM [10295].[dbo].[_InfoRg7251] WHERE _Fld7252 = $1;`
-	qrGetUserInfo               = `SELECT full_name, position, department FROM "user" WHERE username = $1;`
+	qrGetUserInfo               = `SELECT full_name, position, department, COALESCE(mail, ''), COALESCE(mobile, '-'), COALESCE(chief, '-') FROM "user" WHERE username = $1;`
+	qrGetAllUsersInfo           = `SELECT full_name, position, department, COALESCE(mail, ''), COALESCE(mobile, '-') FROM "user";`
 	qrGetRole                   = `SELECT "role" FROM "user" WHERE username = $1;`
 	qrGetPassByUsername         = `SELECT "password" FROM "user" WHERE username = $1;`
 	qrGetUserIDByUsername       = `SELECT user_id FROM "user" WHERE username = $1;`
 	qrGetUserById               = `SELECT "1c" FROM "user" WHERE user_id = $1;`
 	qrGetUsernameByUserID       = `SELECT username FROM "user" WHERE user_id = $1;`
+	qrGetImagePathByUserID      = `SELECT COALESCE(image_path, '') FROM "user" WHERE user_id = $1;`
 	qrGetRefreshTokenIDByUserID = `SELECT refresh_token_id FROM refresh_token WHERE user_id = $1;`
 	qrStoreRefreshTokenID       = `INSERT INTO refresh_token (user_id, refresh_token_id)
 								   VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE
@@ -23,8 +25,8 @@ const (
 )
 
 type User struct {
-	UserID     int    `json:"user_id,omitempty"`
-	Data1C     string `json:"data_1c,omitempty"`
+	UserID int `json:"user_id,omitempty"`
+	//Data1C     string `json:"data_1c,omitempty"`
 	Username   string `json:"username,omitempty"`
 	FullName   string `json:"full_name,omitempty"`
 	Position   string `json:"position,omitempty"`
@@ -32,12 +34,16 @@ type User struct {
 	Balance    int    `json:"balance,omitempty"`
 	Password   string `json:"password,omitempty"`
 	Role       int    `json:"role,omitempty"`
+	Mail       string `json:"mail"`
+	Mobile     string `json:"mobile"`
+	Chief      string `json:"chief"`
+	ImagePath  string `json:"image_path"`
 }
 
-func (u *User) NewUser(storage *postgres.Storage, username, fullName, position, department string, role int) error {
+func (u *User) NewUser(storage *postgres.Storage, username, fullName, position, department, mobile, mail string, role int) error {
 	const op = "storage.postgres.entities.user.NewUser"
 
-	err := storage.DB.QueryRow(qrNewUser, username, fullName, position, department, role).Scan(&u.UserID)
+	err := storage.DB.QueryRow(qrNewUser, username, fullName, position, department, mobile, mail, role).Scan(&u.UserID)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -137,6 +143,17 @@ func (u *User) GetUsername(storage *postgres.Storage, userID int) error {
 	return nil
 }
 
+func (u *User) GetImagePath(storage *postgres.Storage, userID int) error {
+	const op = "storage.postgres.entities.user.GetImagePath"
+
+	err := storage.DB.QueryRow(qrGetImagePathByUserID, userID).Scan(&u.ImagePath)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
 func (u *User) GetUserInfo(storage *postgres.Storage, username string) error {
 	const op = "storage.postgres.entities.user.GetUserInfo"
 
@@ -146,12 +163,38 @@ func (u *User) GetUserInfo(storage *postgres.Storage, username string) error {
 	}
 	defer stmt.Close()
 
-	err = stmt.QueryRow(username).Scan(&u.FullName, &u.Position, &u.Department)
+	err = stmt.QueryRow(username).Scan(&u.FullName, &u.Position, &u.Department, &u.Mail, &u.Mobile, &u.Chief)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	return nil
+}
+
+func (u *User) GetAllUsersInfo(storage *postgres.Storage) ([]User, error) {
+	const op = "storage.postgres.entities.user.GetAllUsersInfo"
+
+	stmt, err := storage.DB.Prepare(qrGetAllUsersInfo)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	defer stmt.Close()
+
+	qrResult, err := stmt.Query()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	us := []User{}
+
+	for qrResult.Next() {
+		if err := qrResult.Scan(&u.FullName, &u.Position, &u.Department, &u.Mail, &u.Mobile); err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		us = append(us, *u)
+	}
+
+	return us, nil
 }
 
 func (u *User) GetFullNameByUsername(storage1C *mssql.Storage, username string) error {

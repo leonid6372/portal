@@ -17,7 +17,7 @@ const (
 
 func New(logLVL string) (*slog.Logger, *os.File) {
 	todayDate := time.Now().Format(time.DateOnly)
-	logPath, err := filepath.Abs(fmt.Sprintf("/var/go-apps/corp-portal/test/portal/logs/%s.txt", todayDate))
+	logPath, err := filepath.Abs(fmt.Sprintf("/var/go-apps/corp-portal/prod/portal/logs/%s.txt", todayDate))
 	if err != nil {
 		panic(err)
 	}
